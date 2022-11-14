@@ -26,6 +26,13 @@ func ValueAs(value *api.DeviceValue, out interface{}) bool {
 			return true
 		}
 
+	case *api.ColorValue:
+		if value.Color != nil {
+			outVal.Hue = value.Color.Hue
+			outVal.Sat = value.Color.Sat
+			return true
+		}
+
 	default:
 		panic(fmt.Sprintf("unsupported output type: %+v", out))
 	}
@@ -45,6 +52,9 @@ func ValueFrom(name string, value interface{}) *api.DeviceValue {
 
 	case *api.TextValue:
 		out.Text = val
+
+	case *api.ColorValue:
+		out.Color = val
 
 	default:
 		panic(fmt.Sprintf("unsupported value type: %+v", value))
