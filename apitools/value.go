@@ -62,3 +62,27 @@ func ValueFrom(name string, value interface{}) *api.DeviceValue {
 
 	return nil
 }
+
+func ValueFields(name string, value *api.DeviceValue) map[string]interface{} {
+	out := make(map[string]interface{})
+
+	switch {
+	case value.Bool != nil:
+		out[name] = value.Bool.Value
+
+	case value.Number != nil:
+		out[name] = value.Number.Value
+
+	case value.Text != nil:
+		out[name] = value.Text.Value
+
+	case value.Color != nil:
+		out[name+".hue"] = value.Color.Hue
+		out[name+".sat"] = value.Color.Sat
+
+	default:
+		panic(fmt.Sprintf("unsupported value type: %+v", value))
+	}
+
+	return out
+}
