@@ -60,7 +60,7 @@ func ValueFrom(name string, value interface{}) *api.DeviceValue {
 		panic(fmt.Sprintf("unsupported value type: %+v", value))
 	}
 
-	return nil
+	return out
 }
 
 func ValueFields(name string, value *api.DeviceValue) map[string]interface{} {
