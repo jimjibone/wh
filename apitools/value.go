@@ -44,6 +44,18 @@ func ValueFrom(name string, value interface{}) *api.DeviceValue {
 	out := &api.DeviceValue{Name: name}
 
 	switch val := value.(type) {
+	case api.BoolValue:
+		out.Bool = &val
+
+	case api.NumberValue:
+		out.Number = &val
+
+	case api.TextValue:
+		out.Text = &val
+
+	case api.ColorValue:
+		out.Color = &val
+
 	case *api.BoolValue:
 		out.Bool = val
 
