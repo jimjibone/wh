@@ -28,16 +28,16 @@ func (s Schedule[T]) GetCurrent(t time.Time) (ScheduleEntry[T], time.Time) {
 	found := false
 	var curr ScheduleEntry[T]
 	for _, e := range s {
-		if e.Time.Before(t) {
+		if e.Time.IsDay(t) && e.Time.Before(t) {
 			found = true
 			curr = e
 		}
 	}
-	if !found {
+	for !found {
 		// Try the previous day.
 		t = time.Date(t.Year(), t.Month(), t.Day()-1, 23, 59, 59, 999999, t.Location())
 		for _, e := range s {
-			if e.Time.Before(t) {
+			if e.Time.IsDay(t) && e.Time.Before(t) {
 				found = true
 				curr = e
 			}
@@ -51,17 +51,17 @@ func (s Schedule[T]) GetNext(t time.Time) (ScheduleEntry[T], time.Time) {
 	found := false
 	var curr ScheduleEntry[T]
 	for _, e := range s {
-		if !e.Time.Before(t) {
+		if e.Time.IsDay(t) && !e.Time.Before(t) {
 			found = true
 			curr = e
 			break
 		}
 	}
-	if !found {
+	for !found {
 		// Try the next day.
-		t = time.Date(t.Year(), t.Month(), t.Day()+1, 23, 59, 59, 999999, t.Location())
+		t = time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, t.Location())
 		for _, e := range s {
-			if !e.Time.Before(t) {
+			if e.Time.IsDay(t) && !e.Time.Before(t) {
 				found = true
 				curr = e
 				break

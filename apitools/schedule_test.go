@@ -57,20 +57,26 @@ func TestScheduleTimeStr(t *testing.T) {
 	sched, err = ScheduleTimeStr("11:39:56")
 	if err != nil {
 		t.Errorf("ScheduleTimeStr returned error for %q: %s", "11:39:56", err)
-	} else if sched.Hour != 11 || sched.Minute != 39 || sched.Second != 56 {
+	} else if sched.Hour != 11 || sched.Minute != 39 || sched.Second != 56 || len(sched.Days) != 0 {
 		t.Errorf("ScheduleTimeStr returned incorrect time for %q: %s", "11:39:56", sched)
+	}
+	sched, err = ScheduleTimeStr("12:40:57", time.Monday)
+	if err != nil {
+		t.Errorf("ScheduleTimeStr returned error for %q: %s", "12:40:57 [mon]", err)
+	} else if sched.Hour != 12 || sched.Minute != 40 || sched.Second != 57 || len(sched.Days) != 1 || sched.Days[0] != time.Monday {
+		t.Errorf("ScheduleTimeStr returned incorrect time for %q: %s", "12:40:57 [mon]", sched)
 	}
 }
 
 func TestSchedule(t *testing.T) {
 	sched := Schedule[float64]{
-		{Time: MustScheduleTimeStr("06:30:00"), Value: 18.0},
-		{Time: MustScheduleTimeStr("07:30:00"), Value: 14.0},
-		{Time: MustScheduleTimeStr("16:30:00"), Value: 28.0},
-		{Time: MustScheduleTimeStr("22:00:00"), Value: 14.0},
+		{Time: MustScheduleTimeStr("06:30:00", time.Monday), Value: 18.0},
+		{Time: MustScheduleTimeStr("07:30:00", Weekdays...), Value: 14.0},
+		{Time: MustScheduleTimeStr("16:30:00", time.Monday, time.Tuesday), Value: 28.0},
+		{Time: MustScheduleTimeStr("22:00:00", time.Wednesday), Value: 14.0},
 	}
 
-	now := time.Date(2023, 01, 31, 2, 10, 36, 0, time.Local)
+	now := time.Date(2023, 01, 31, 17, 10, 36, 0, time.Local) // tuesday
 
 	currentSched, currentTime := sched.GetCurrent(now)
 	t.Logf("current sched: %s, time: %s", currentSched, currentTime)
