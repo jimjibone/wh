@@ -80,7 +80,7 @@ func MustScheduleTimeStr(t string, days ...time.Weekday) scheduleTime {
 	return s
 }
 
-func (s scheduleTime) seconds() int {
+func (s scheduleTime) seconds(t time.Time) int {
 	return s.Hour*3600 + s.Minute*60 + s.Second
 }
 
@@ -140,37 +140,9 @@ func (s scheduleTime) IsDay(t time.Time) bool {
 	return false
 }
 
-func (s scheduleTime) OnDay(t time.Time) (t2 time.Time) {
+func (s scheduleTime) OnDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), s.Hour, s.Minute, s.Second, 0, t.Location())
 }
-
-// func (s scheduleTime) OnDay2(t time.Time) time.Time {
-// 	if len(s.Days) == 0 {
-// 		return s.OnDay(t)
-// 	}
-
-// 	log.Printf("t = %s", t)
-// 	log.Printf("s = %s", s.String())
-
-// 	nextDay := t.Weekday()
-// 	_ = nextDay
-// 	maxDist := time.Weekday(7)
-// 	for i, d := range s.Days {
-// 		log.Printf("  day %d = %s", d, d)
-// 		dist := d - t.Weekday()
-// 		log.Printf("  dist %d", dist)
-// 		if dist < 0 {
-// 			dist += 7
-// 			log.Printf("  dist %d", dist)
-// 		}
-// 		if dist < maxDist {
-// 			log.Printf("  max dist %d", dist)
-// 			nextDay = d
-// 			maxDist = dist
-// 		}
-// 	}
-// 	return s.OnDay(t)
-// }
 
 func (s scheduleTime) Before(t time.Time) bool {
 	st := s.OnDay(t)
