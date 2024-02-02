@@ -5,13 +5,15 @@ import (
 )
 
 type BoolValue struct {
-	Name  string
-	Value bool
+	Name     string
+	ReadOnly bool
+	Value    bool
 }
 
 func (bv *BoolValue) GetValue() *api.DeviceValue {
 	return &api.DeviceValue{
-		Name: bv.Name,
+		Name:     bv.Name,
+		ReadOnly: bv.ReadOnly,
 		Bool: &api.BoolValue{
 			Value: bv.Value,
 		},
@@ -27,13 +29,15 @@ func (bv *BoolValue) Parse(req *api.DeviceValue) (v bool, ok bool) {
 }
 
 type NumberValue struct {
-	Name  string
-	Value float64
+	Name     string
+	ReadOnly bool
+	Value    float64
 }
 
 func (nv *NumberValue) GetValue() *api.DeviceValue {
 	return &api.DeviceValue{
-		Name: nv.Name,
+		Name:     nv.Name,
+		ReadOnly: nv.ReadOnly,
 		Number: &api.NumberValue{
 			Value: nv.Value,
 		},
