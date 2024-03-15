@@ -1,4 +1,4 @@
-package internal
+package paths
 
 import (
 	"log"
