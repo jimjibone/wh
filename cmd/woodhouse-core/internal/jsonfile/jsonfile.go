@@ -1,9 +1,12 @@
 package jsonfile
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
+
+	"github.com/jimjibone/woodhouse-4/shared/atomicfile"
 )
 
 func LoadFile(data interface{}, filename string) error {
@@ -28,21 +31,17 @@ func LoadFile(data interface{}, filename string) error {
 }
 
 func SaveFile(data interface{}, filename string) error {
-	// Open/create the file.
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
 	// Encode the config.
-	enc := json.NewEncoder(f)
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
 	enc.SetIndent("", "  ")
-	err = enc.Encode(data)
+	err := enc.Encode(data)
 	if err != nil {
 		return err
 	}
-	return nil
+
+	// Atomically write the file.
+	return atomicfile.WriteFile(filename, 0644, buf)
 }
 
 func SaveFileIfNotExist(data interface{}, filename string) error {

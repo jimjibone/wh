@@ -1,10 +1,12 @@
 package yamlfile
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/jimjibone/woodhouse-4/shared/atomicfile"
 	"gopkg.in/yaml.v2"
 )
 
@@ -34,19 +36,15 @@ func LoadFile(data interface{}, filename string) error {
 }
 
 func SaveFile(data interface{}, filename string) error {
-	// Open/create the file.
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
 	// Encode the config.
-	err = yaml.NewEncoder(f).Encode(data)
+	buf := &bytes.Buffer{}
+	err := yaml.NewEncoder(buf).Encode(data)
 	if err != nil {
 		return err
 	}
-	return nil
+
+	// Atomically write the file.
+	return atomicfile.WriteFile(filename, 0644, buf)
 }
 
 func SaveFileIfNotExist(data interface{}, filename string) error {
