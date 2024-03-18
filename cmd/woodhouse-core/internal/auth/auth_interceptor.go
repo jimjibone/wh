@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/jimjibone/woodhouse-4/cmd/woodhouse-core/bridges"
 	"github.com/jimjibone/woodhouse-4/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -12,11 +13,11 @@ import (
 )
 
 type AuthInterceptor struct {
-	ba                    *BridgeAuth
+	ba                    *bridges.JWTManager
 	authorisationRequired map[string]bool // bool indicates if auth required
 }
 
-func NewAuthInterceptor(ba *BridgeAuth) *AuthInterceptor {
+func NewAuthInterceptor(ba *bridges.JWTManager) *AuthInterceptor {
 	return &AuthInterceptor{
 		ba: ba,
 		authorisationRequired: map[string]bool{
@@ -124,7 +125,7 @@ func (ai *AuthInterceptor) authorize(ctx context.Context, method string) (contex
 		return nil, status.Errorf(codes.Unauthenticated, "access token is invalid: %v", err)
 	}
 
-	return context.WithValue(ctx, AccessTokenClaimsType, claims), nil
+	return context.WithValue(ctx, bridges.AccessTokenClaimsType, claims), nil
 
 	// for _, perm := range accessibleMethod.Perms {
 	// 	for _, claimPerm := range claims.Perms {
