@@ -167,6 +167,8 @@ type AccessTokenClaims struct {
 	BridgeID   string `json:"bridge_id"`
 }
 
+var AccessTokenClaimsType struct{}
+
 func (manager *BridgeAuth) GenerateTokens(id string) (*TokenDetails, error) {
 	u1, err := uuid.NewV4()
 	if err != nil {
