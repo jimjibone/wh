@@ -3,6 +3,7 @@ package wh
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"os"
 	"os/signal"
@@ -19,7 +20,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -164,7 +164,7 @@ func (client *Client) pair(ctx context.Context) bool {
 	creds := credentials.NewTLS(&tls.Config{
 		InsecureSkipVerify: true,
 	})
-	creds = insecure.NewCredentials()
+	//creds = insecure.NewCredentials()
 
 	// Connect to the server.
 	connCtx, connCancel := context.WithTimeout(ctx, 10*time.Second)
@@ -364,9 +364,59 @@ func (client *Client) connect(ctx context.Context) bool {
 
 	client.log.Debugf("connection started")
 	defer client.log.Debugf("connection finished")
-	client.log.Debugf("token: %s", token)
-	client.log.Debugf("cert: %s", cert)
+	// client.log.Debugf("token: %s", token)
+	// client.log.Debugf("cert: %s", cert)
 	time.Sleep(5 * time.Second)
+
+	// Require TLS and now we care about trusting it. Use the server cert we
+	// got previously.
+	certpool := x509.NewCertPool()
+	ok := certpool.AppendCertsFromPEM(cert)
+	if !ok {
+		// The cert is probably bad, so trigger pairing by deleting it.
+		client.log.Errorf("failed to load server cert")
+		client.store.Del("cert")
+		return false
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		InsecureSkipVerify: false,
+		RootCAs:            certpool,
+		ServerName:         "woodhouse",
+	})
+	//creds = insecure.NewCredentials()
+
+	// Connect to the server.
+	connCtx, connCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer connCancel()
+	conn, err := grpc.DialContext(
+		connCtx,
+		client.serverAddr,
+		grpc.WithTransportCredentials(creds),
+	)
+	if err != nil {
+		client.log.Errorf("connection failed: %s", err)
+		return false
+	}
+	defer conn.Close()
+
+	service := clientsapi.NewAuthServiceClient(conn)
+
+	pairCtx, pairCancel := context.WithCancel(ctx)
+	defer pairCancel()
+	rpc, err := service.Pair(pairCtx)
+	if err != nil {
+		//code := status.Code(err)
+		// if code == codes.Unavailable {
+		// 	client.log.Debugf("failed to start: server offline")
+		// } else {
+		client.log.Errorf("failed to start: %s", err)
+		//}
+		return false
+	}
+
+	_ = token
+	_ = cert
+	_ = rpc
 
 	return true
 }

@@ -72,11 +72,11 @@ func GenerateSelfSignedCert(privKey *rsa.PrivateKey) ([]byte, error) {
 		Subject: pkix.Name{
 			Organization: []string{"woodhouse"},
 		},
-		DNSNames:              []string{"woodhouse-bridges"},
+		DNSNames:              []string{"woodhouse"},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(1000, 0, 0),
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment | x509.KeyUsageKeyAgreement,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 	}
 
