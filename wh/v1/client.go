@@ -164,7 +164,6 @@ func (client *Client) pair(ctx context.Context) bool {
 	creds := credentials.NewTLS(&tls.Config{
 		InsecureSkipVerify: true,
 	})
-	//creds = insecure.NewCredentials()
 
 	// Connect to the server.
 	connCtx, connCancel := context.WithTimeout(ctx, 10*time.Second)
@@ -364,9 +363,6 @@ func (client *Client) connect(ctx context.Context) bool {
 
 	client.log.Debugf("connection started")
 	defer client.log.Debugf("connection finished")
-	// client.log.Debugf("token: %s", token)
-	// client.log.Debugf("cert: %s", cert)
-	time.Sleep(5 * time.Second)
 
 	// Require TLS and now we care about trusting it. Use the server cert we
 	// got previously.
@@ -383,21 +379,37 @@ func (client *Client) connect(ctx context.Context) bool {
 		RootCAs:            certpool,
 		ServerName:         "woodhouse",
 	})
-	//creds = insecure.NewCredentials()
 
-	// Connect to the server.
+	// Intercept server requests and add auth tokens.
+	auth := NewAuthInterceptor(token, func(token []byte) {
+		if err := client.store.Set("token", token); err != nil {
+			client.log.Errorf("failed to save token: %s", err)
+		}
+	})
+	defer auth.Close()
+
+	// Create a connection to the server for regular requests.
 	connCtx, connCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer connCancel()
 	conn, err := grpc.DialContext(
 		connCtx,
 		client.serverAddr,
 		grpc.WithTransportCredentials(creds),
+		grpc.WithUnaryInterceptor(auth.Unary()),
+		grpc.WithStreamInterceptor(auth.Stream()),
 	)
 	if err != nil {
 		client.log.Errorf("connection failed: %s", err)
 		return false
 	}
 	defer conn.Close()
+
+	// Start the auth (fetches a new access token).
+	err = auth.Start(conn)
+	if err != nil {
+		client.log.Errorf("failed to create auth: %s", err)
+		return false
+	}
 
 	service := clientsapi.NewAuthServiceClient(conn)
 
@@ -417,6 +429,8 @@ func (client *Client) connect(ctx context.Context) bool {
 	_ = token
 	_ = cert
 	_ = rpc
+
+	time.Sleep(5 * time.Second)
 
 	return true
 }
