@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"sync"
 	"syscall"
 	"time"
 
@@ -32,6 +33,8 @@ type Client struct {
 	minBackoff  time.Duration
 	maxBackoff  time.Duration
 	lastBackoff time.Duration
+
+	handlers []ConnectionHandler
 }
 
 // Create a new woodhouse client. The store is used to keep pairing secrets
@@ -58,6 +61,8 @@ func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Cli
 
 type ClientOption func(*Client)
 
+type ConnectionHandler func(ctx context.Context, conn *grpc.ClientConn)
+
 // Sets the client ID manually. Overrides the default option of generating one
 // automatically.
 func WithClientID(id string) ClientOption {
@@ -70,6 +75,13 @@ func WithClientID(id string) ClientOption {
 func WithLogLevel(level log.Level) ClientOption {
 	return func(c *Client) {
 		c.log = log.NewContext(log.DefaultLogger, "client", level)
+	}
+}
+
+// Set log level. Overrides the default of warnings and above.
+func WithConnectionHandler(handler ConnectionHandler) ClientOption {
+	return func(c *Client) {
+		c.handlers = append(c.handlers, handler)
 	}
 }
 
@@ -419,26 +431,14 @@ func (client *Client) connect(ctx context.Context) bool {
 		return false
 	}
 
-	service := clientsapi.NewAuthServiceClient(conn)
-
-	pairCtx, pairCancel := context.WithCancel(ctx)
-	defer pairCancel()
-	rpc, err := service.Pair(pairCtx)
-	if err != nil {
-		//code := status.Code(err)
-		// if code == codes.Unavailable {
-		// 	client.log.Debugf("failed to start: server offline")
-		// } else {
-		client.log.Errorf("failed to start: %s", err)
-		//}
-		return false
+	// Start connection handlers.
+	handlerCtx, handlerCancel := context.WithCancel(connCtx)
+	defer handlerCancel()
+	wg := sync.WaitGroup{}
+	for _, handler := range client.handlers {
+		wg.Add(1)
+		go handler(handlerCtx, conn)
 	}
-
-	_ = token
-	_ = cert
-	_ = rpc
-
-	time.Sleep(5 * time.Second)
 
 	// TODO: continue connection
 
