@@ -3,11 +3,11 @@ package stores
 import (
 	"bytes"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/jimjibone/woodhouse-4/log"
 	"github.com/jimjibone/woodhouse-4/shared/atomicfile"
 	"github.com/jimjibone/woodhouse-4/shared/paths"
 )
@@ -51,8 +51,8 @@ func (store *fsStore) Set(key string, value []byte) error {
 }
 
 func (store *fsStore) Has(key string) bool {
-	_, err := os.Stat(filepath.Join(store.path, key))
-	return !os.IsNotExist(err)
+	info, err := os.Stat(filepath.Join(store.path, key))
+	return !os.IsNotExist(err) && info.Size() > 0
 }
 
 func (store *fsStore) Get(key string) ([]byte, error) {
@@ -60,7 +60,8 @@ func (store *fsStore) Get(key string) ([]byte, error) {
 }
 
 func (store *fsStore) Del(key string) error {
-	return os.Remove(filepath.Join(store.path, key))
+	err := os.Remove(filepath.Join(store.path, key))
+	return err
 }
 
 type memStore struct {
@@ -84,8 +85,8 @@ func (store *memStore) Set(key string, value []byte) error {
 func (store *memStore) Has(key string) bool {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
-	_, found := store.db[key]
-	return found
+	val, found := store.db[key]
+	return found && len(val) > 0
 }
 
 func (store *memStore) Get(key string) ([]byte, error) {

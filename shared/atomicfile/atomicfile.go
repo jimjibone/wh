@@ -31,7 +31,7 @@ func WriteFile(filename string, defaultMode os.FileMode, r io.Reader) (err error
 			_ = os.Remove(f.Name()) // yes, ignore the error, not much we can do about it.
 		}
 	}()
-	// ensure we always close f. Note that this does not conflict with  the
+	// ensure we always close f. Note that this does not conflict with the
 	// close below, as close is idempotent.
 	defer f.Close()
 	name := f.Name()

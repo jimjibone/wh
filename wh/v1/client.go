@@ -110,6 +110,7 @@ func (client *Client) Run() error {
 	signal.Notify(c, os.Interrupt)
 	signal.Notify(c, syscall.SIGTERM)
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
 		<-c
 		// Stop delivering signals.
@@ -331,7 +332,7 @@ func (client *Client) pair(ctx context.Context) bool {
 		return false
 	}
 
-	return false
+	return true
 }
 
 // Connects to the server using the stored secrets gathered during pairing. If
@@ -408,6 +409,13 @@ func (client *Client) connect(ctx context.Context) bool {
 	err = auth.Start(conn)
 	if err != nil {
 		client.log.Errorf("failed to create auth: %s", err)
+
+		// If we've been unauthenticated delete the token from the store to
+		// trigger pairing.
+		if code := status.Code(err); code == codes.Unauthenticated {
+			client.log.Infof("resetting auth to trigger pairing")
+			auth.Reset()
+		}
 		return false
 	}
 
@@ -431,6 +439,13 @@ func (client *Client) connect(ctx context.Context) bool {
 	_ = rpc
 
 	time.Sleep(5 * time.Second)
+
+	// TODO: continue connection
+
+	// Wait for the context to be closed.
+	client.log.Debugf("connection complete")
+	<-ctx.Done()
+	client.log.Debugf("connection finishing")
 
 	return true
 }

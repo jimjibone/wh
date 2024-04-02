@@ -82,6 +82,13 @@ func (auth *AuthInterceptor) Start(conn *grpc.ClientConn) error {
 	return nil
 }
 
+// Reset auth tokens to force pairing.
+func (auth *AuthInterceptor) Reset() {
+	auth.refreshToken = ""
+	auth.accessToken = ""
+	auth.changed = true
+}
+
 func (auth *AuthInterceptor) refresh(ctx context.Context) error {
 	res, err := auth.client.Refresh(ctx, &clientsapi.RefreshRequest{
 		RefreshToken:   auth.refreshToken,
@@ -90,9 +97,7 @@ func (auth *AuthInterceptor) refresh(ctx context.Context) error {
 	if err != nil {
 		if status.Code(err) == codes.Unauthenticated {
 			// Erase the refresh token if unauthenticated.
-			auth.refreshToken = ""
-			auth.accessToken = ""
-			auth.changed = true
+			auth.Reset()
 		}
 		return err
 	}
