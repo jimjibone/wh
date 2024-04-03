@@ -2,6 +2,7 @@ package wh
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -89,7 +90,19 @@ func (auth *AuthInterceptor) Reset() {
 	auth.changed = true
 }
 
+func (auth *AuthInterceptor) Ping(ctx context.Context) error {
+	if auth.client != nil {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		_, err := auth.client.Ping(ctx, &clientsapi.PingRequest{})
+		return err
+	}
+	return fmt.Errorf("no client")
+}
+
 func (auth *AuthInterceptor) refresh(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	res, err := auth.client.Refresh(ctx, &clientsapi.RefreshRequest{
 		RefreshToken:   auth.refreshToken,
 		RenewThreshold: 7,
@@ -118,7 +131,8 @@ func (auth *AuthInterceptor) attachToken(ctx context.Context) context.Context {
 func (interceptor *AuthInterceptor) requiresAuth(method string) bool {
 	switch method {
 	case "/woodhouse.api.v1.clients.AuthService/Pair",
-		"/woodhouse.api.v1.clients.AuthService/Refresh":
+		"/woodhouse.api.v1.clients.AuthService/Refresh",
+		"/woodhouse.api.v1.clients.AuthService/Ping":
 		return false
 	default:
 		return true

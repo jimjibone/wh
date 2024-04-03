@@ -134,19 +134,24 @@ func (client *Client) Run() error {
 	// Now run forever or until the context is done.
 	done := false
 	for !done {
-		// Start by pairing. If we're already paired then this will instantly
-		// return true.
-		paired := client.pair(ctx)
+		// Start by pinging the server. This prevents us showing pairing error
+		// messages if the server is offline.
+		online := client.ping(ctx)
 
 		connected := false
-		if paired {
-			// Connect to the server with the pairing credentials. If this
-			// actually connected to the server then it will return true.
-			connected = client.connect(ctx)
+		if online {
+			// Now do the pairing. If we're already paired then this will
+			// instantly return true.
+			paired := client.pair(ctx)
+
+			if paired {
+				// Connect to the server with the pairing credentials. If this
+				// actually connected to the server then it will return true.
+				connected = client.connect(ctx)
+			}
 		}
 
-		// In both cases if the client disconnects then implement exponential
-		// backoff.
+		// If the client didn't connect then implement exponential backoff.
 		client.backoff(ctx, connected)
 
 		// Exit the loop if the context is done.
@@ -160,6 +165,69 @@ func (client *Client) Run() error {
 	return nil
 }
 
+// Ping the server and return true if the server responded.
+func (client *Client) ping(ctx context.Context) bool {
+	client.log.Debugf("ping started")
+	defer client.log.Debugf("ping finished")
+
+	// Require TLS but we don't care about trusting it, we'll sort that out in a
+	// moment.
+	creds := credentials.NewTLS(&tls.Config{
+		InsecureSkipVerify: true,
+	})
+
+	// Connect to the server.
+	connCtx, connCancel := context.WithCancel(ctx)
+	defer connCancel()
+	conn, err := grpc.DialContext(
+		connCtx,
+		client.serverAddr,
+		grpc.WithTransportCredentials(creds),
+	)
+	if err != nil {
+		client.log.Errorf("pairing connection failed: %s", err)
+		return false
+	}
+	defer conn.Close()
+
+	// Create the service and send the ping.
+	service := clientsapi.NewAuthServiceClient(conn)
+
+	// Send the ping until successful.
+	firstLog := true
+	for {
+		pingCtx, pingCancel := context.WithTimeout(ctx, 10*time.Second)
+		defer pingCancel()
+		_, err = service.Ping(pingCtx, &clientsapi.PingRequest{})
+		if err != nil {
+			if code := status.Code(err); code == codes.Unavailable {
+				client.log.Debugf("ping: server offline: %s", err)
+			} else {
+				client.log.Errorf("ping: server offline: %s", err)
+			}
+		} else {
+			return true
+		}
+
+		// If the server didn't respond on the first attempt then mention that
+		// it's offline.
+		if firstLog {
+			firstLog = false
+			client.log.Infof("waiting for server to come online")
+		}
+
+		// If the client didn't connect then implement exponential backoff.
+		client.backoff(ctx, false)
+
+		// Exit the loop if the context is done.
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+		}
+	}
+}
+
 // Attempt to pair with the server. If the client is already paired it will
 // return true instantly. If not it will try to pair with the server and
 // eventually return true. If the pair was unsuccessful this will return false.
@@ -169,8 +237,8 @@ func (client *Client) pair(ctx context.Context) bool {
 		return true
 	}
 
-	client.log.Debugf("pairing started")
-	defer client.log.Debugf("pairing finished")
+	client.log.Infof("pairing started")
+	defer client.log.Infof("pairing finished")
 
 	// Require TLS but we don't care about trusting it, we'll sort that out in a
 	// moment.
@@ -374,8 +442,8 @@ func (client *Client) connect(ctx context.Context) bool {
 		return false
 	}
 
-	client.log.Debugf("connection started")
-	defer client.log.Debugf("connection finished")
+	client.log.Infof("connection started")
+	defer client.log.Infof("connection finished")
 
 	// Require TLS and now we care about trusting it. Use the server cert we
 	// got previously.
@@ -432,19 +500,41 @@ func (client *Client) connect(ctx context.Context) bool {
 	}
 
 	// Start connection handlers.
-	handlerCtx, handlerCancel := context.WithCancel(connCtx)
-	defer handlerCancel()
 	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	handlerCtx, handlerCancel := context.WithCancel(context.Background())
+	defer handlerCancel()
 	for _, handler := range client.handlers {
 		wg.Add(1)
-		go handler(handlerCtx, conn)
+		go func(handler ConnectionHandler) {
+			handler(handlerCtx, conn)
+			wg.Done()
+		}(handler)
 	}
 
-	// TODO: continue connection
-
-	// Wait for the context to be closed.
+	// Monitor the connection and return if it closes.
 	client.log.Debugf("connection complete")
-	<-ctx.Done()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	done := false
+	for !done {
+		select {
+		case <-ctx.Done():
+			// Exit if the context is closed.
+			done = true
+
+		case <-ticker.C:
+			// Check the connection.
+			if err := auth.Ping(handlerCtx); err != nil {
+				if code := status.Code(err); code == codes.Unavailable {
+					client.log.Debugf("server went offline: %s", err)
+				} else {
+					client.log.Errorf("server went offline - ping error: %s", err)
+				}
+				done = true
+			}
+		}
+	}
 	client.log.Debugf("connection finishing")
 
 	return true
