@@ -147,12 +147,15 @@ func (interceptor *AuthInterceptor) Unary() grpc.UnaryClientInterceptor {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		interceptor.log.Debugf("--> unary: %s", method)
 
-		// if interceptor.requiresAuth(method) {
-		// 	return invoker(interceptor.attachToken(ctx), method, req, reply, cc, opts...)
-		// }
+		if interceptor.requiresAuth(method) {
+			interceptor.log.Debugf("--> unary: %s (with auth)", method)
+			return invoker(interceptor.attachToken(ctx), method, req, reply, cc, opts...)
+		}
 
+		if method != "/woodhouse.api.v1.clients.AuthService/Ping" {
+			interceptor.log.Debugf("--> unary: %s (no auth)", method)
+		}
 		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }
@@ -166,12 +169,12 @@ func (interceptor *AuthInterceptor) Stream() grpc.StreamClientInterceptor {
 		streamer grpc.Streamer,
 		opts ...grpc.CallOption,
 	) (grpc.ClientStream, error) {
-		interceptor.log.Debugf("--> stream: %s", method)
+		if interceptor.requiresAuth(method) {
+			interceptor.log.Debugf("--> stream: %s (with auth)", method)
+			return streamer(interceptor.attachToken(ctx), desc, cc, method, opts...)
+		}
 
-		// if interceptor.requiresAuth(method) {
-		// 	return streamer(interceptor.attachToken(ctx), desc, cc, method, opts...)
-		// }
-
+		interceptor.log.Debugf("--> stream: %s (no auth)", method)
 		return streamer(ctx, desc, cc, method, opts...)
 	}
 }
