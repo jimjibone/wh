@@ -104,8 +104,7 @@ func (auth *AuthInterceptor) refresh(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	res, err := auth.client.Refresh(ctx, &clientsapi.RefreshRequest{
-		RefreshToken:   auth.refreshToken,
-		RenewThreshold: 7,
+		RefreshToken: auth.refreshToken,
 	})
 	if err != nil {
 		if status.Code(err) == codes.Unauthenticated {
