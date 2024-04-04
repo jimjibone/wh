@@ -26,7 +26,7 @@ import (
 
 type Client struct {
 	log        *log.Context
-	store      stores.Store
+	store      *clientStore
 	serverAddr string
 	clientID   string
 
@@ -43,7 +43,7 @@ type Client struct {
 func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Client {
 	client := &Client{
 		log:        log.NewContext(log.DefaultLogger, "client", log.DebugLevel),
-		store:      store,
+		store:      newClientStore(store),
 		serverAddr: serverAddr,
 		clientID:   "",
 
@@ -86,10 +86,16 @@ func WithConnectionHandler(handler ConnectionHandler) ClientOption {
 }
 
 func (client *Client) Run() error {
+	// Upgrade the store to the latest schema.
+	err := client.store.Upgrade(client.log)
+	if err != nil {
+		return fmt.Errorf("failed to upgrade the store: %w", err)
+	}
+
 	// Get the client id.
 	if client.clientID == "" {
 		// If the store doesn't have an id then generate a new one.
-		if !client.store.Has("id") {
+		if !client.store.HasID() {
 			name, err := random.GenerateRandomName(2)
 			if err != nil {
 				client.log.Fatalf("failed to generate client ID: %s", err)
@@ -97,13 +103,13 @@ func (client *Client) Run() error {
 			client.clientID = name
 
 			// Write it to the store.
-			err = client.store.Set("id", []byte(client.clientID))
+			err = client.store.SetID([]byte(client.clientID))
 			if err != nil {
 				return fmt.Errorf("failed to write client id to store: %s", err)
 			}
 		} else {
 			// Read it from the store.
-			data, err := client.store.Get("id")
+			data, err := client.store.GetID()
 			if err != nil {
 				return fmt.Errorf("failed to read client id from store: %s", err)
 			}
@@ -232,7 +238,7 @@ func (client *Client) ping(ctx context.Context) bool {
 // return true instantly. If not it will try to pair with the server and
 // eventually return true. If the pair was unsuccessful this will return false.
 func (client *Client) pair(ctx context.Context) bool {
-	if client.store.Has("token") && client.store.Has("cert") {
+	if client.store.HasToken() && client.store.HasCert() {
 		client.log.Debugf("using previous token and cert")
 		return true
 	}
@@ -401,12 +407,12 @@ func (client *Client) pair(ctx context.Context) bool {
 	client.log.Debugf("pairing client token is %s", token)
 
 	// Save token and cert to the store.
-	err = client.store.Set("token", []byte(token))
+	err = client.store.SetToken([]byte(token))
 	if err != nil {
 		client.log.Errorf("pairing failed to write token: %s", err)
 		return false
 	}
-	err = client.store.Set("cert", cert)
+	err = client.store.SetCert(cert)
 	if err != nil {
 		client.log.Errorf("pairing failed to write cert: %s", err)
 		return false
@@ -419,23 +425,23 @@ func (client *Client) pair(ctx context.Context) bool {
 // the connection was successful it will return true, otherwise it will return
 // false if the connection failed instantly.
 func (client *Client) connect(ctx context.Context) bool {
-	token, err := client.store.Get("token")
+	token, err := client.store.GetToken()
 	if err != nil {
 		client.log.Errorf("failed to read token from store: %s", err)
 
 		// Delete the token from the store to trigger pairing.
-		err = client.store.Del("token")
+		err = client.store.DelToken()
 		if err != nil {
 			client.log.Errorf("failed to delete token from store: %s", err)
 		}
 		return false
 	}
-	cert, err := client.store.Get("cert")
+	cert, err := client.store.GetCert()
 	if err != nil {
 		client.log.Errorf("failed to read cert from store: %s", err)
 
 		// Delete the cert from the store to trigger pairing.
-		err = client.store.Del("cert")
+		err = client.store.DelCert()
 		if err != nil {
 			client.log.Errorf("failed to delete cert from store: %s", err)
 		}
@@ -452,7 +458,7 @@ func (client *Client) connect(ctx context.Context) bool {
 	if !ok {
 		// The cert is probably bad, so trigger pairing by deleting it.
 		client.log.Errorf("failed to load server cert")
-		client.store.Del("cert")
+		client.store.DelCert()
 		return false
 	}
 	creds := credentials.NewTLS(&tls.Config{
@@ -463,7 +469,7 @@ func (client *Client) connect(ctx context.Context) bool {
 
 	// Intercept server requests and add auth tokens.
 	auth := NewAuthInterceptor(token, func(token []byte) {
-		if err := client.store.Set("token", token); err != nil {
+		if err := client.store.SetToken(token); err != nil {
 			client.log.Errorf("failed to save token: %s", err)
 		}
 	})
