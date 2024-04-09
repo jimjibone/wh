@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/jimjibone/woodhouse-4/shared/atomicfile"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func LoadFile(data interface{}, filename string) error {
