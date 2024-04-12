@@ -12,11 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jimjibone/queue/v2"
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
 	"github.com/jimjibone/woodhouse-4/log"
 	"github.com/jimjibone/woodhouse-4/shared/crypt"
 	"github.com/jimjibone/woodhouse-4/shared/random"
 	"github.com/jimjibone/woodhouse-4/shared/stores"
+	"github.com/jimjibone/woodhouse-4/wh/v1/devices"
 	"github.com/schollz/pake/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -35,6 +37,10 @@ type Client struct {
 	lastBackoff time.Duration
 
 	handlers []ConnectionHandler
+
+	devicesMu sync.RWMutex                     // locks the devices map only
+	devices   map[string]devices.Device        // key=id
+	updates   *queue.Queue[*clientsapi.Device] // outgoing updates from this client's devices
 }
 
 // Create a new woodhouse client. The store is used to keep pairing secrets
@@ -50,6 +56,9 @@ func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Cli
 		minBackoff:  time.Second,
 		maxBackoff:  32 * time.Second,
 		lastBackoff: 0,
+
+		devices: make(map[string]devices.Device),
+		updates: queue.New[*clientsapi.Device](),
 	}
 
 	for _, o := range opts {
@@ -83,6 +92,18 @@ func WithConnectionHandler(handler ConnectionHandler) ClientOption {
 	return func(c *Client) {
 		c.handlers = append(c.handlers, handler)
 	}
+}
+
+// Add a device to the client.
+func (client *Client) AddDevice(device devices.Device) error {
+	client.devicesMu.Lock()
+	defer client.devicesMu.Unlock()
+	if _, found := client.devices[device.ID()]; found {
+		return fmt.Errorf("device id already exists in client")
+	}
+	client.devices[device.ID()] = device
+	device.SendFullState()
+	return nil
 }
 
 func (client *Client) Run() error {
