@@ -54,23 +54,25 @@ type Device interface {
 }
 
 type DeviceImpl struct {
-	id       string
-	typ      clientsapi.Device_DeviceType
-	comms    *Comms
-	services map[string]services.Service
-	updates  chan *clientsapi.Service
-	wg       sync.WaitGroup
-	close    func()
+	id         string
+	typ        clientsapi.Device_DeviceType
+	comms      *Comms
+	services   map[string]services.Service
+	fullStates chan *clientsapi.Device
+	updates    chan *clientsapi.Service
+	wg         sync.WaitGroup
+	close      func()
 }
 
 func NewDevice(id string, typ clientsapi.Device_DeviceType) *DeviceImpl {
 	ctx, close := context.WithCancel(context.Background())
 	dev := &DeviceImpl{
-		id:       id,
-		typ:      typ,
-		services: make(map[string]services.Service),
-		updates:  make(chan *clientsapi.Service, 1),
-		close:    close,
+		id:         id,
+		typ:        typ,
+		services:   make(map[string]services.Service),
+		fullStates: make(chan *clientsapi.Device, 1),
+		updates:    make(chan *clientsapi.Service, 1),
+		close:      close,
 	}
 	dev.wg.Add(1)
 	go dev.run(ctx)
@@ -95,15 +97,16 @@ func (dev *DeviceImpl) Init(comms *Comms) { dev.comms = comms }
 
 func (dev *DeviceImpl) SendFullState() {
 	pb := &clientsapi.Device{
-		Id:       dev.id,
-		Typ:      dev.typ,
-		Services: []*clientsapi.Service{},
+		Id:        dev.id,
+		FullState: true,
+		Typ:       dev.typ,
+		Services:  []*clientsapi.Service{},
 	}
 	for _, srv := range dev.services {
 		pb.Services = append(pb.Services, srv.Pb())
 	}
 	log.Infof("sending full state - id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(dev.services), services.PrettyServices("", pb.Services))
-	dev.comms.SendState(pb)
+	dev.fullStates <- pb
 }
 
 func (dev *DeviceImpl) pusher(srv *clientsapi.Service) {
@@ -129,6 +132,10 @@ func (dev *DeviceImpl) run(ctx context.Context) {
 	count := 0
 	cache := make(map[string]*clientsapi.Service)
 
+	resetCache := func() {
+		count = 0
+		cache = make(map[string]*clientsapi.Service)
+	}
 	sendCache := func() {
 		// Send the cached update if it's not empty.
 		if len(cache) > 0 {
@@ -145,8 +152,7 @@ func (dev *DeviceImpl) run(ctx context.Context) {
 			dev.comms.SendState(pb)
 
 			// Reset the cache.
-			count = 0
-			cache = make(map[string]*clientsapi.Service)
+			resetCache()
 		}
 	}
 
@@ -155,6 +161,10 @@ func (dev *DeviceImpl) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+
+		case state := <-dev.fullStates:
+			resetCache()
+			dev.comms.SendState(state)
 
 		case update := <-dev.updates:
 			// Merge the new update into the cache.
