@@ -27,13 +27,15 @@ func timeFromPb(t *clientsapi.TimeValue) time.Time {
 	return time.Unix(t.Seconds, int64(t.Nanos))
 }
 
-func timeToPb(t time.Time) *clientsapi.TimeAttribute {
+func timeToPb(t time.Time, p clientsapi.Permissions) *clientsapi.TimeAttribute {
+	secs, nanos := t.Unix(), int32(t.Nanosecond())
 	if t.IsZero() {
-		return &clientsapi.TimeAttribute{}
+		secs, nanos = 0, 0
 	}
 	return &clientsapi.TimeAttribute{
-		Seconds: t.Unix(),
-		Nanos:   int32(t.Nanosecond()),
+		Seconds: secs,
+		Nanos:   nanos,
+		Perms:   p,
 	}
 }
 
@@ -87,9 +89,7 @@ func (attr *Time) IsSet() bool                           { return attr.isSet }
 func (attr *Time) Push(push func(*clientsapi.Attribute)) { attr.push = push }
 func (attr *Time) Pb() *clientsapi.Attribute {
 	return &clientsapi.Attribute{
-		Id: attr.id,
-		Attr: &clientsapi.Attribute_Time{
-			Time: timeToPb(attr.value),
-		},
+		Id:   attr.id,
+		Time: timeToPb(attr.value, attr.perms),
 	}
 }

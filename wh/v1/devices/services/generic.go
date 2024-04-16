@@ -140,7 +140,7 @@ func (srv *Generic) pusher(attr *clientsapi.Attribute) {
 	if srv.push != nil {
 		srv.push(&clientsapi.Service{
 			Id:    srv.id,
-			Typ:   clientsapi.Service_INFO,
+			Typ:   srv.typ,
 			Alias: srv.alias,
 			Attrs: []*clientsapi.Attribute{attr},
 		})

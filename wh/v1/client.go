@@ -38,9 +38,9 @@ type Client struct {
 
 	handlers []ConnectionHandler
 
-	devicesMu sync.RWMutex                     // locks the devices map only
-	devices   map[string]devices.Device        // key=id
-	updates   *queue.Queue[*clientsapi.Device] // outgoing updates from this client's devices
+	devicesMu sync.RWMutex              // locks the devices map only
+	devices   map[string]devices.Device // key=id
+	updates   *queue.Queue[*clientsapi.Device]
 }
 
 // Create a new woodhouse client. The store is used to keep pairing secrets
@@ -60,6 +60,9 @@ func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Cli
 		devices: make(map[string]devices.Device),
 		updates: queue.New[*clientsapi.Device](),
 	}
+
+	// Discard updates until we're connected to the server.
+	client.updates.Discard(true)
 
 	for _, o := range opts {
 		o(client)
@@ -102,6 +105,9 @@ func (client *Client) AddDevice(device devices.Device) error {
 		return fmt.Errorf("device id already exists in client")
 	}
 	client.devices[device.ID()] = device
+	device.Init(func(state *clientsapi.Device) {
+		client.updates.Push(state)
+	})
 	device.SendFullState()
 	return nil
 }
@@ -527,7 +533,7 @@ func (client *Client) connect(ctx context.Context) bool {
 	}
 
 	// Start connection handlers.
-	wg := sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 	handlerCtx, handlerCancel := context.WithCancel(context.Background())
 	defer handlerCancel()
@@ -538,6 +544,10 @@ func (client *Client) connect(ctx context.Context) bool {
 			wg.Done()
 		}(handler)
 	}
+
+	// Start the device control/feedback loop.
+	wg.Add(1)
+	go client.deviceFeedback(handlerCtx, wg, conn)
 
 	// Monitor the connection and return if it closes.
 	client.log.Debugf("connection complete")
@@ -588,5 +598,49 @@ func (client *Client) backoff(ctx context.Context, reset bool) {
 	select {
 	case <-ctx.Done():
 	case <-timer.C:
+	}
+}
+
+func (client *Client) deviceFeedback(ctx context.Context, wg *sync.WaitGroup, conn *grpc.ClientConn) {
+	defer wg.Done()
+
+	client.log.Infof("device feedback started")
+	defer client.log.Infof("device feedback finished")
+
+	service := clientsapi.NewClientServiceClient(conn)
+	stream, err := service.StatusStream(ctx)
+	if err != nil {
+		client.log.Errorf("failed to start status stream: %s", err)
+		return
+	}
+
+	// Stop discarding updates until we exit.
+	client.updates.Discard(false)
+	defer client.updates.Discard(true)
+
+	// Get all devices to send their full states.
+	client.devicesMu.RLock()
+	for _, dev := range client.devices {
+		dev.SendFullState()
+	}
+	client.devicesMu.RUnlock()
+
+	// Now wait for updates.
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case update := <-client.updates.Pop():
+			// Send the update to the server.
+			err := stream.Send(&clientsapi.StatusUpdate{
+				DeviceInfo: []*clientsapi.Device{
+					update,
+				},
+			})
+			if err != nil {
+				client.log.Errorf("failed to send device update: %s", err)
+			}
+		}
 	}
 }

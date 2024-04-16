@@ -6,34 +6,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jimjibone/queue/v2"
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
 	"github.com/jimjibone/woodhouse-4/log"
 	"github.com/jimjibone/woodhouse-4/wh/v1/devices/services"
 )
-
-type Comms struct {
-	updates *queue.Queue[*clientsapi.Device]
-}
-
-// SendState sends a device state message to the server. This may either contain
-// all services, or a diff of those changed since the last call of SendState by
-// the device. The client will indicate if a full state should be sent by
-// calling SendFullState on the device.
-func (comms *Comms) SendState(state *clientsapi.Device) {
-	if comms != nil {
-		comms.updates.Push(state)
-	}
-}
 
 type Device interface {
 	// ID returns the device's ID.
 	ID() string
 
 	// Init is called when the device is added to the client. This should be
-	// used to keep the Comms pointer for later use and may be used for other
+	// used to keep the sendState func for later use and may be used for other
 	// initialisation tasks.
-	Init(comms *Comms)
+	// sendState sends a device state message to the server. This may either contain
+	// all services, or a diff of those changed since the last call of SendState by
+	// the device. The client will indicate if a full state should be sent by
+	// calling SendFullState on the device.
+	Init(sendState func(state *clientsapi.Device))
 
 	// SendFullState is called when a full device state should be sent to the
 	// server. This is typically done just after the client connects to the
@@ -54,25 +43,25 @@ type Device interface {
 }
 
 type DeviceImpl struct {
-	id         string
-	typ        clientsapi.Device_DeviceType
-	comms      *Comms
-	services   map[string]services.Service
-	fullStates chan *clientsapi.Device
-	updates    chan *clientsapi.Service
-	wg         sync.WaitGroup
-	close      func()
+	id             string
+	typ            clientsapi.Device_DeviceType
+	sendState      func(state *clientsapi.Device)
+	services       map[string]services.Service
+	deviceUpdates  chan *clientsapi.Device
+	serviceUpdates chan *clientsapi.Service
+	wg             sync.WaitGroup
+	close          func()
 }
 
 func NewDevice(id string, typ clientsapi.Device_DeviceType) *DeviceImpl {
 	ctx, close := context.WithCancel(context.Background())
 	dev := &DeviceImpl{
-		id:         id,
-		typ:        typ,
-		services:   make(map[string]services.Service),
-		fullStates: make(chan *clientsapi.Device, 1),
-		updates:    make(chan *clientsapi.Service, 1),
-		close:      close,
+		id:             id,
+		typ:            typ,
+		services:       make(map[string]services.Service),
+		deviceUpdates:  make(chan *clientsapi.Device, 1),
+		serviceUpdates: make(chan *clientsapi.Service, 1),
+		close:          close,
 	}
 	dev.wg.Add(1)
 	go dev.run(ctx)
@@ -92,8 +81,9 @@ func (dev *DeviceImpl) AddService(srvs ...services.Service) {
 	}
 }
 
-func (dev *DeviceImpl) ID() string        { return dev.id }
-func (dev *DeviceImpl) Init(comms *Comms) { dev.comms = comms }
+func (dev *DeviceImpl) ID() string { return dev.id }
+
+func (dev *DeviceImpl) Init(sendState func(state *clientsapi.Device)) { dev.sendState = sendState }
 
 func (dev *DeviceImpl) SendFullState() {
 	pb := &clientsapi.Device{
@@ -105,12 +95,12 @@ func (dev *DeviceImpl) SendFullState() {
 	for _, srv := range dev.services {
 		pb.Services = append(pb.Services, srv.Pb())
 	}
-	log.Infof("sending full state - id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(dev.services), services.PrettyServices("", pb.Services))
-	dev.fullStates <- pb
+	log.Infof("sending full state - id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(dev.services), services.PrettyServices("  ", pb.Services))
+	dev.deviceUpdates <- pb
 }
 
 func (dev *DeviceImpl) pusher(srv *clientsapi.Service) {
-	dev.updates <- srv
+	dev.serviceUpdates <- srv
 }
 
 func (dev *DeviceImpl) HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error {
@@ -148,8 +138,12 @@ func (dev *DeviceImpl) run(ctx context.Context) {
 				pb.Services = append(pb.Services, srv)
 			}
 
-			log.Infof("sending update id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(cache), services.PrettyServices("", pb.Services))
-			dev.comms.SendState(pb)
+			log.Infof("sending update id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(cache), services.PrettyServices("  ", pb.Services))
+			if dev.sendState != nil {
+				dev.sendState(pb)
+			} else {
+				panic(fmt.Sprintf("device %q is not registered with a client", dev.id))
+			}
 
 			// Reset the cache.
 			resetCache()
@@ -162,11 +156,15 @@ func (dev *DeviceImpl) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 
-		case state := <-dev.fullStates:
+		case state := <-dev.deviceUpdates:
 			resetCache()
-			dev.comms.SendState(state)
+			if dev.sendState != nil {
+				dev.sendState(state)
+			} else {
+				panic(fmt.Sprintf("device %q is not registered with a client", dev.id))
+			}
 
-		case update := <-dev.updates:
+		case update := <-dev.serviceUpdates:
 			// Merge the new update into the cache.
 			if srv, found := cache[update.GetId()]; found {
 				srv.Id = update.Id

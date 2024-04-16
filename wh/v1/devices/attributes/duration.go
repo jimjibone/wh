@@ -77,14 +77,12 @@ func (attr *Duration) Push(push func(*clientsapi.Attribute)) { attr.push = push 
 func (attr *Duration) Pb() *clientsapi.Attribute {
 	return &clientsapi.Attribute{
 		Id: attr.id,
-		Attr: &clientsapi.Attribute_Duration{
-			Duration: &clientsapi.DurationAttribute{
-				Value: int64(attr.value),
-				Min:   int64(attr.min),
-				Max:   int64(attr.max),
-				Step:  uint64(attr.step),
-				Perms: attr.perms,
-			},
+		Duration: &clientsapi.DurationAttribute{
+			Value: int64(attr.value),
+			Min:   int64(attr.min),
+			Max:   int64(attr.max),
+			Step:  uint64(attr.step),
+			Perms: attr.perms,
 		},
 	}
 }

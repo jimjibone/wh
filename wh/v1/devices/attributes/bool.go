@@ -67,11 +67,9 @@ func (attr *Bool) Push(push func(*clientsapi.Attribute)) { attr.push = push }
 func (attr *Bool) Pb() *clientsapi.Attribute {
 	return &clientsapi.Attribute{
 		Id: attr.id,
-		Attr: &clientsapi.Attribute_Bool{
-			Bool: &clientsapi.BoolAttribute{
-				Value: attr.value,
-				Perms: attr.perms,
-			},
+		Bool: &clientsapi.BoolAttribute{
+			Value: attr.value,
+			Perms: attr.perms,
 		},
 	}
 }

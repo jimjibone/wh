@@ -67,11 +67,9 @@ func (attr *Text) Push(push func(*clientsapi.Attribute)) { attr.push = push }
 func (attr *Text) Pb() *clientsapi.Attribute {
 	return &clientsapi.Attribute{
 		Id: attr.id,
-		Attr: &clientsapi.Attribute_Text{
-			Text: &clientsapi.TextAttribute{
-				Value: attr.value,
-				Perms: attr.perms,
-			},
+		Text: &clientsapi.TextAttribute{
+			Value: attr.value,
+			Perms: attr.perms,
 		},
 	}
 }

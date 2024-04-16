@@ -76,15 +76,13 @@ func (attr *Float) Push(push func(*clientsapi.Attribute)) { attr.push = push }
 func (attr *Float) Pb() *clientsapi.Attribute {
 	return &clientsapi.Attribute{
 		Id: attr.id,
-		Attr: &clientsapi.Attribute_Float{
-			Float: &clientsapi.FloatAttribute{
-				Value: attr.value,
-				Min:   attr.min,
-				Max:   attr.max,
-				Step:  attr.step,
-				Unit:  attr.unit,
-				Perms: attr.perms,
-			},
+		Float: &clientsapi.FloatAttribute{
+			Value: attr.value,
+			Min:   attr.min,
+			Max:   attr.max,
+			Step:  attr.step,
+			Unit:  attr.unit,
+			Perms: attr.perms,
 		},
 	}
 }

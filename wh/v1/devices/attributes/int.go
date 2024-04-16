@@ -75,15 +75,13 @@ func (attr *Int) Push(push func(*clientsapi.Attribute)) { attr.push = push }
 func (attr *Int) Pb() *clientsapi.Attribute {
 	return &clientsapi.Attribute{
 		Id: attr.id,
-		Attr: &clientsapi.Attribute_Int{
-			Int: &clientsapi.IntAttribute{
-				Value: attr.value,
-				Min:   attr.min,
-				Max:   attr.max,
-				Step:  attr.step,
-				Unit:  attr.unit,
-				Perms: attr.perms,
-			},
+		Int: &clientsapi.IntAttribute{
+			Value: attr.value,
+			Min:   attr.min,
+			Max:   attr.max,
+			Step:  attr.step,
+			Unit:  attr.unit,
+			Perms: attr.perms,
 		},
 	}
 }
