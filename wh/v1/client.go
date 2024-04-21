@@ -546,8 +546,9 @@ func (client *Client) connect(ctx context.Context) bool {
 	}
 
 	// Start the device control/feedback loop.
-	wg.Add(1)
-	go client.deviceFeedback(handlerCtx, wg, conn)
+	wg.Add(2)
+	go client.deviceFeedback(handlerCtx, handlerCancel, wg, conn)
+	go client.deviceControl(handlerCtx, handlerCancel, wg, conn)
 
 	// Monitor the connection and return if it closes.
 	client.log.Debugf("connection complete")
@@ -557,6 +558,10 @@ func (client *Client) connect(ctx context.Context) bool {
 	for !done {
 		select {
 		case <-ctx.Done():
+			// Exit if the context is closed.
+			done = true
+
+		case <-handlerCtx.Done():
 			// Exit if the context is closed.
 			done = true
 
@@ -601,7 +606,8 @@ func (client *Client) backoff(ctx context.Context, reset bool) {
 	}
 }
 
-func (client *Client) deviceFeedback(ctx context.Context, wg *sync.WaitGroup, conn *grpc.ClientConn) {
+func (client *Client) deviceFeedback(ctx context.Context, close func(), wg *sync.WaitGroup, conn *grpc.ClientConn) {
+	defer close()
 	defer wg.Done()
 
 	client.log.Infof("device feedback started")
@@ -641,6 +647,89 @@ func (client *Client) deviceFeedback(ctx context.Context, wg *sync.WaitGroup, co
 			if err != nil {
 				client.log.Errorf("failed to send device update: %s", err)
 			}
+		}
+	}
+}
+
+func (client *Client) deviceControl(ctx context.Context, close func(), wg *sync.WaitGroup, conn *grpc.ClientConn) {
+	defer close()
+	defer wg.Done()
+
+	client.log.Infof("device control started")
+	defer client.log.Infof("device control finished")
+
+	service := clientsapi.NewClientServiceClient(conn)
+	stream, err := service.ActionStream(ctx)
+	if err != nil {
+		client.log.Errorf("failed to start action stream: %s", err)
+		return
+	}
+
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			code := status.Code(err)
+			if code == codes.Unavailable || code == codes.Canceled {
+				client.log.Debugf("action stream closed: %s", err)
+			} else {
+				client.log.Errorf("failed to recv action request: %s", err)
+			}
+			return
+		} else {
+			client.log.Debugf("received action: %s", req)
+
+			// Find the device.
+			client.devicesMu.RLock()
+			dev, found := client.devices[req.GetDeviceId()]
+			client.devicesMu.RUnlock()
+			if !found {
+				err := stream.Send(&clientsapi.ActionResponse{
+					ActionId: req.GetActionId(),
+					Status:   clientsapi.ActionResponse_ERROR,
+					Details:  "device not found",
+				})
+				if err != nil {
+					client.log.Errorf("failed to send action response: %s", err)
+				}
+			}
+
+			// Let the device handle it in another goroutine.
+			go func() {
+				lastStatus := clientsapi.ActionResponse_UNDEFINED
+				err := dev.HandleAction(req, func(res *clientsapi.ActionResponse) {
+					client.log.Debugf("sending action response: %s", res)
+					lastStatus = res.Status
+					err := stream.Send(res)
+					if err != nil {
+						client.log.Errorf("failed to send action response: %s", err)
+					}
+				})
+				if err != nil {
+					client.log.Debugf("sending action error response: %s", err)
+					err := stream.Send(&clientsapi.ActionResponse{
+						ActionId: req.GetActionId(),
+						Status:   clientsapi.ActionResponse_ERROR,
+						Details:  err.Error(),
+					})
+					if err != nil {
+						client.log.Errorf("failed to send action error response: %s", err)
+					}
+				} else {
+					// Auto return complete if no other final status was sent.
+					if lastStatus < clientsapi.ActionResponse_COMPLETE {
+						res := &clientsapi.ActionResponse{
+							ActionId: req.GetActionId(),
+							Status:   clientsapi.ActionResponse_COMPLETE,
+							Details:  "",
+						}
+						client.log.Debugf("sending action auto response: %s", res)
+						err := stream.Send(res)
+						if err != nil {
+							client.log.Errorf("failed to send action auto response: %s", err)
+						}
+					}
+				}
+			}()
 		}
 	}
 }
