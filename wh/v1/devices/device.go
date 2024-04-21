@@ -95,7 +95,7 @@ func (dev *DeviceImpl) SendFullState() {
 	for _, srv := range dev.services {
 		pb.Services = append(pb.Services, srv.Pb())
 	}
-	log.Infof("sending full state - id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(dev.services), services.PrettyServices("  ", pb.Services))
+	log.Debugf("sending full state - id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(dev.services), services.PrettyServices("  ", pb.Services))
 	dev.deviceUpdates <- pb
 }
 
@@ -138,7 +138,7 @@ func (dev *DeviceImpl) run(ctx context.Context) {
 				pb.Services = append(pb.Services, srv)
 			}
 
-			log.Infof("sending update id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(cache), services.PrettyServices("  ", pb.Services))
+			log.Debugf("sending update id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(cache), services.PrettyServices("  ", pb.Services))
 			if dev.sendState != nil {
 				dev.sendState(pb)
 			} else {
