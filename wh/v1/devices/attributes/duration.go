@@ -55,7 +55,7 @@ func (attr *Duration) Set(value time.Duration) bool {
 // HandleAction calls the attribute's OnAction handler if set.
 func (attr *Duration) HandleAction(val *clientsapi.DurationValue) {
 	if attr.onAction != nil {
-		attr.onAction(time.Duration(val.GetValue()))
+		attr.onAction(time.Duration(val.GetValue()) * time.Millisecond)
 	}
 }
 
@@ -78,10 +78,10 @@ func (attr *Duration) Pb() *clientsapi.Attribute {
 	return &clientsapi.Attribute{
 		Id: attr.id,
 		Duration: &clientsapi.DurationAttribute{
-			Value: int64(attr.value),
-			Min:   int64(attr.min),
-			Max:   int64(attr.max),
-			Step:  uint64(attr.step),
+			Value: int64(attr.value / time.Millisecond),
+			Min:   int64(attr.min / time.Millisecond),
+			Max:   int64(attr.max / time.Millisecond),
+			Step:  uint64(attr.step / time.Millisecond),
 			Perms: attr.perms,
 		},
 	}
