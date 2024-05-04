@@ -14,8 +14,12 @@ type Switch struct {
 }
 
 func NewSwitch() *Switch {
+	return NewSwitchID("switch")
+}
+
+func NewSwitchID(id string) *Switch {
 	srv := &Switch{
-		Generic: newGeneric("switch", clientsapi.Service_SWITCH),
+		Generic: newGeneric(id, clientsapi.Service_SWITCH),
 		On:      attributes.NewBool("on", clientsapi.Permissions_PERM_READONLY, attributes.Required),
 	}
 	srv.AddAttribute(

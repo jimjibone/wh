@@ -18,8 +18,12 @@ type Relay struct {
 }
 
 func NewRelay() *Relay {
+	return NewRelayID("relay")
+}
+
+func NewRelayID(id string) *Relay {
 	srv := &Relay{
-		Generic:     newGeneric("relay", clientsapi.Service_RELAY),
+		Generic:     newGeneric(id, clientsapi.Service_RELAY),
 		On:          attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required),
 		Voltage:     attributes.NewFloat("voltage", clientsapi.Permissions_PERM_READONLY, attributes.Optional, 0, 0, 0, clientsapi.Unit_UNIT_VOLTS),
 		Current:     attributes.NewFloat("current", clientsapi.Permissions_PERM_READONLY, attributes.Optional, 0, 0, 0, clientsapi.Unit_UNIT_AMPS),

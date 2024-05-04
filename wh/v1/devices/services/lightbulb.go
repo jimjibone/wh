@@ -20,8 +20,12 @@ type Lightbulb struct {
 }
 
 func NewLightbulb() *Lightbulb {
+	return NewLightbulbID("lightbulb")
+}
+
+func NewLightbulbID(id string) *Lightbulb {
 	srv := &Lightbulb{
-		Generic:    newGeneric("lightbulb", clientsapi.Service_LIGHTBULB),
+		Generic:    newGeneric(id, clientsapi.Service_LIGHTBULB),
 		On:         attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required),
 		Brightness: attributes.NewInt("brightness", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),
 		Saturation: attributes.NewInt("saturation", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),

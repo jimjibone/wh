@@ -20,7 +20,11 @@ type Generic struct {
 var _ Service = (*Generic)(nil)
 
 func NewGeneric() *Generic {
-	return newGeneric("generic", clientsapi.Service_GENERIC)
+	return NewGenericID("generic")
+}
+
+func NewGenericID(id string) *Generic {
+	return newGeneric(id, clientsapi.Service_GENERIC)
 }
 
 func newGeneric(id string, typ clientsapi.Service_ServiceType) *Generic {
