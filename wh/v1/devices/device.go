@@ -11,36 +11,36 @@ import (
 	"github.com/jimjibone/woodhouse-4/wh/v1/devices/services"
 )
 
-type Device interface {
-	// ID returns the device's ID.
-	ID() string
+// type Device interface {
+// 	// ID returns the device's ID.
+// 	ID() string
 
-	// Init is called when the device is added to the client. This should be
-	// used to keep the sendState func for later use and may be used for other
-	// initialisation tasks.
-	// sendState sends a device state message to the server. This may either contain
-	// all services, or a diff of those changed since the last call of SendState by
-	// the device. The client will indicate if a full state should be sent by
-	// calling SendFullState on the device.
-	Init(sendState func(state *clientsapi.Device))
+// 	// Init is called when the device is added to the client. This should be
+// 	// used to keep the sendState func for later use and may be used for other
+// 	// initialisation tasks.
+// 	// sendState sends a device state message to the server. This may either contain
+// 	// all services, or a diff of those changed since the last call of SendState by
+// 	// the device. The client will indicate if a full state should be sent by
+// 	// calling SendFullState on the device.
+// 	Init(sendState func(state *clientsapi.Device))
 
-	// SendFullState is called when a full device state should be sent to the
-	// server. This is typically done just after the client connects to the
-	// server or this device is added to the client after connection.
-	SendFullState()
+// 	// SendFullState is called when a full device state should be sent to the
+// 	// server. This is typically done just after the client connects to the
+// 	// server or this device is added to the client after connection.
+// 	SendFullState()
 
-	// HandleAction is called in its own goroutine when an ActionRequest is
-	// received from the server. During this the implementer should forward the
-	// request to the contained services and attributes. The implementer is
-	// responsible for ensuring safety of concurrency. During this time the
-	// implementer may send ActionResponse feedback at any time using the
-	// feedback func, which is useful if the request has the potential to take a
-	// long time or timeout, for example. When the function returns a final
-	// ActionResponse will be sent back to the server. If the returned error is
-	// nil the response status will be COMPLETE, otherwise ERR with the details
-	// field containing the error message.
-	HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error
-}
+// 	// HandleAction is called in its own goroutine when an ActionRequest is
+// 	// received from the server. During this the implementer should forward the
+// 	// request to the contained services and attributes. The implementer is
+// 	// responsible for ensuring safety of concurrency. During this time the
+// 	// implementer may send ActionResponse feedback at any time using the
+// 	// feedback func, which is useful if the request has the potential to take a
+// 	// long time or timeout, for example. When the function returns a final
+// 	// ActionResponse will be sent back to the server. If the returned error is
+// 	// nil the response status will be COMPLETE, otherwise ERR with the details
+// 	// field containing the error message.
+// 	HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error
+// }
 
 type DeviceImpl struct {
 	id             string
@@ -81,10 +81,21 @@ func (dev *DeviceImpl) AddService(srvs ...services.Service) {
 	}
 }
 
+// ID returns the device's ID.
 func (dev *DeviceImpl) ID() string { return dev.id }
 
+// Init is called when the device is added to the client. This should be
+// used to keep the sendState func for later use and may be used for other
+// initialisation tasks.
+// sendState sends a device state message to the server. This may either contain
+// all services, or a diff of those changed since the last call of SendState by
+// the device. The client will indicate if a full state should be sent by
+// calling SendFullState on the device.
 func (dev *DeviceImpl) Init(sendState func(state *clientsapi.Device)) { dev.sendState = sendState }
 
+// SendFullState is called when a full device state should be sent to the
+// server. This is typically done just after the client connects to the
+// server or this device is added to the client after connection.
 func (dev *DeviceImpl) SendFullState() {
 	pb := &clientsapi.Device{
 		Id:        dev.id,
@@ -103,6 +114,16 @@ func (dev *DeviceImpl) pusher(srv *clientsapi.Service) {
 	dev.serviceUpdates <- srv
 }
 
+// HandleAction is called in its own goroutine when an ActionRequest is
+// received from the server. During this the implementer should forward the
+// request to the contained services and attributes. The implementer is
+// responsible for ensuring safety of concurrency. During this time the
+// implementer may send ActionResponse feedback at any time using the
+// feedback func, which is useful if the request has the potential to take a
+// long time or timeout, for example. When the function returns a final
+// ActionResponse will be sent back to the server. If the returned error is
+// nil the response status will be COMPLETE, otherwise ERR with the details
+// field containing the error message.
 func (dev *DeviceImpl) HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error {
 	srv, found := dev.services[request.GetServiceId()]
 	if !found {

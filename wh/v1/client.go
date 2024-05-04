@@ -38,8 +38,8 @@ type Client struct {
 
 	handlers []ConnectionHandler
 
-	devicesMu sync.RWMutex              // locks the devices map only
-	devices   map[string]devices.Device // key=id
+	devicesMu sync.RWMutex                   // locks the devices map only
+	devices   map[string]*devices.DeviceImpl // key=id
 	updates   *queue.Queue[*clientsapi.Device]
 }
 
@@ -57,7 +57,7 @@ func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Cli
 		maxBackoff:  32 * time.Second,
 		lastBackoff: 0,
 
-		devices: make(map[string]devices.Device),
+		devices: make(map[string]*devices.DeviceImpl),
 		updates: queue.New[*clientsapi.Device](),
 	}
 
@@ -98,7 +98,7 @@ func WithConnectionHandler(handler ConnectionHandler) ClientOption {
 }
 
 // Add a device to the client.
-func (client *Client) AddDevice(device devices.Device) error {
+func (client *Client) AddDevice(device *devices.DeviceImpl) error {
 	client.devicesMu.Lock()
 	defer client.devicesMu.Unlock()
 	if _, found := client.devices[device.ID()]; found {
