@@ -47,6 +47,10 @@ func NewTime(id string, perms clientsapi.Permissions, optional OptionalType) *Ti
 	}
 }
 
+func (attr *Time) SetOptional(optional OptionalType) {
+	attr.optional = optional
+}
+
 func (attr *Time) Get() time.Time {
 	return attr.value
 }

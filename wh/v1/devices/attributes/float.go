@@ -33,6 +33,10 @@ func NewFloat(id string, perms clientsapi.Permissions, optional OptionalType, mi
 	}
 }
 
+func (attr *Float) SetOptional(optional OptionalType) {
+	attr.optional = optional
+}
+
 func (attr *Float) Get() float64 {
 	return attr.value
 }

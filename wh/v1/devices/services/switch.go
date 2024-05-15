@@ -13,11 +13,9 @@ type Switch struct {
 	On *attributes.Bool // required
 }
 
-func NewSwitch() *Switch {
-	return NewSwitchID("switch")
-}
-
-func NewSwitchID(id string) *Switch {
+// New Relay service. The service ID must be unique within the device and is
+// normally the service name in lowercase (e.g. "relay").
+func NewSwitch(id string) *Switch {
 	srv := &Switch{
 		Generic: newGeneric(id, clientsapi.Service_SWITCH),
 		On:      attributes.NewBool("on", clientsapi.Permissions_PERM_READONLY, attributes.Required),

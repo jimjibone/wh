@@ -32,6 +32,10 @@ func NewInt(id string, perms clientsapi.Permissions, optional OptionalType, min,
 	}
 }
 
+func (attr *Int) SetOptional(optional OptionalType) {
+	attr.optional = optional
+}
+
 func (attr *Int) Get() int64 {
 	return attr.value
 }

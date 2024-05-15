@@ -24,6 +24,10 @@ func NewBool(id string, perms clientsapi.Permissions, optional OptionalType) *Bo
 	}
 }
 
+func (attr *Bool) SetOptional(optional OptionalType) {
+	attr.optional = optional
+}
+
 func (attr *Bool) Get() bool {
 	return attr.value
 }

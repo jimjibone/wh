@@ -24,6 +24,10 @@ func NewText(id string, perms clientsapi.Permissions, optional OptionalType) *Te
 	}
 }
 
+func (attr *Text) SetOptional(optional OptionalType) {
+	attr.optional = optional
+}
+
 func (attr *Text) Get() string {
 	return attr.value
 }

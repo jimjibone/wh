@@ -34,6 +34,10 @@ func NewDuration(id string, perms clientsapi.Permissions, optional OptionalType,
 	}
 }
 
+func (attr *Duration) SetOptional(optional OptionalType) {
+	attr.optional = optional
+}
+
 func (attr *Duration) Get() time.Duration {
 	return attr.value
 }

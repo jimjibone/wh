@@ -19,11 +19,9 @@ type Generic struct {
 
 var _ Service = (*Generic)(nil)
 
-func NewGeneric() *Generic {
-	return NewGenericID("generic")
-}
-
-func NewGenericID(id string) *Generic {
+// New Generic service. The service ID must be unique within the device and is
+// normally the service name in lowercase (e.g. "generic").
+func NewGeneric(id string) *Generic {
 	return newGeneric(id, clientsapi.Service_GENERIC)
 }
 

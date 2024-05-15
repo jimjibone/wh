@@ -19,11 +19,9 @@ type Lightbulb struct {
 	Transition *attributes.Duration // optional
 }
 
-func NewLightbulb() *Lightbulb {
-	return NewLightbulbID("lightbulb")
-}
-
-func NewLightbulbID(id string) *Lightbulb {
+// New Lightbulb service. The service ID must be unique within the device and is
+// normally the service name in lowercase (e.g. "lightbulb").
+func NewLightbulb(id string) *Lightbulb {
 	srv := &Lightbulb{
 		Generic:    newGeneric(id, clientsapi.Service_LIGHTBULB),
 		On:         attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required),
