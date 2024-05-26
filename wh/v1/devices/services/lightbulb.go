@@ -26,7 +26,7 @@ func NewLightbulb(id string) *Lightbulb {
 		Generic:    newGeneric(id, clientsapi.Service_LIGHTBULB),
 		On:         attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required),
 		Brightness: attributes.NewInt("brightness", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),
-		ColorTemp:  attributes.NewInt("color_temp", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 153, 1000, 1, clientsapi.Unit_UNIT_MIREDS),
+		ColorTemp:  attributes.NewInt("color_temp", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 153, 555, 1, clientsapi.Unit_UNIT_MIREDS),
 		Color:      attributes.NewColor("color", clientsapi.Permissions_PERM_READWRITE, attributes.Optional),
 		Transition: attributes.NewDuration("transition", clientsapi.Permissions_PERM_WRITEONLY, attributes.Optional, 0, 300*time.Second, time.Second),
 	}

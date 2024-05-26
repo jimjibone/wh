@@ -36,24 +36,14 @@ func (attr *Color) Get() (hue, sat, x, y float64) {
 	return attr.hue, attr.sat, attr.x, attr.y
 }
 
-func (attr *Color) SetHueSat(hue, sat float64) bool {
+func (attr *Color) Set(hue, sat, x, y float64) bool {
 	attr.isSet = true
-	if math.Abs(attr.hue-hue) > 0.001 || math.Abs(attr.sat-sat) > 0.001 {
+	if math.Abs(attr.hue-hue) > 0.001 ||
+		math.Abs(attr.sat-sat) > 0.001 ||
+		math.Abs(attr.x-x) > 0.001 ||
+		math.Abs(attr.y-y) > 0.001 {
 		attr.hue = hue
 		attr.sat = sat
-		if attr.push != nil {
-			attr.push(attr.Pb())
-		} else {
-			panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-		}
-		return true
-	}
-	return false
-}
-
-func (attr *Color) SetXY(x, y float64) bool {
-	attr.isSet = true
-	if math.Abs(attr.x-x) > 0.001 || math.Abs(attr.y-y) > 0.001 {
 		attr.x = x
 		attr.y = y
 		if attr.push != nil {
