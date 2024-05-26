@@ -42,7 +42,7 @@ import (
 // 	HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error
 // }
 
-type DeviceImpl struct {
+type Device struct {
 	id             string
 	typ            clientsapi.Device_DeviceType
 	sendState      func(state *clientsapi.Device)
@@ -53,9 +53,9 @@ type DeviceImpl struct {
 	close          func()
 }
 
-func NewDevice(id string, typ clientsapi.Device_DeviceType) *DeviceImpl {
+func NewDevice(id string, typ clientsapi.Device_DeviceType) *Device {
 	ctx, close := context.WithCancel(context.Background())
-	dev := &DeviceImpl{
+	dev := &Device{
 		id:             id,
 		typ:            typ,
 		services:       make(map[string]services.Service),
@@ -68,13 +68,13 @@ func NewDevice(id string, typ clientsapi.Device_DeviceType) *DeviceImpl {
 	return dev
 }
 
-func (dev *DeviceImpl) Close() {
+func (dev *Device) Close() {
 	dev.close()
 	dev.wg.Wait()
 }
 
 // AddService adds the services to the device.
-func (dev *DeviceImpl) AddService(srvs ...services.Service) {
+func (dev *Device) AddService(srvs ...services.Service) {
 	for _, srv := range srvs {
 		srv.Push(dev.pusher)
 		dev.services[srv.ID()] = srv
@@ -82,7 +82,7 @@ func (dev *DeviceImpl) AddService(srvs ...services.Service) {
 }
 
 // ID returns the device's ID.
-func (dev *DeviceImpl) ID() string { return dev.id }
+func (dev *Device) ID() string { return dev.id }
 
 // Init is called when the device is added to the client. This should be
 // used to keep the sendState func for later use and may be used for other
@@ -91,12 +91,12 @@ func (dev *DeviceImpl) ID() string { return dev.id }
 // all services, or a diff of those changed since the last call of SendState by
 // the device. The client will indicate if a full state should be sent by
 // calling SendFullState on the device.
-func (dev *DeviceImpl) Init(sendState func(state *clientsapi.Device)) { dev.sendState = sendState }
+func (dev *Device) Init(sendState func(state *clientsapi.Device)) { dev.sendState = sendState }
 
 // SendFullState is called when a full device state should be sent to the
 // server. This is typically done just after the client connects to the
 // server or this device is added to the client after connection.
-func (dev *DeviceImpl) SendFullState() {
+func (dev *Device) SendFullState() {
 	pb := &clientsapi.Device{
 		Id:        dev.id,
 		FullState: true,
@@ -110,7 +110,7 @@ func (dev *DeviceImpl) SendFullState() {
 	dev.deviceUpdates <- pb
 }
 
-func (dev *DeviceImpl) pusher(srv *clientsapi.Service) {
+func (dev *Device) pusher(srv *clientsapi.Service) {
 	dev.serviceUpdates <- srv
 }
 
@@ -124,7 +124,7 @@ func (dev *DeviceImpl) pusher(srv *clientsapi.Service) {
 // ActionResponse will be sent back to the server. If the returned error is
 // nil the response status will be COMPLETE, otherwise ERR with the details
 // field containing the error message.
-func (dev *DeviceImpl) HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error {
+func (dev *Device) HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error {
 	srv, found := dev.services[request.GetServiceId()]
 	if !found {
 		return fmt.Errorf("service not found")
@@ -132,7 +132,7 @@ func (dev *DeviceImpl) HandleAction(request *clientsapi.ActionRequest, feedback 
 	return srv.Action(request, feedback)
 }
 
-func (dev *DeviceImpl) run(ctx context.Context) {
+func (dev *Device) run(ctx context.Context) {
 	defer dev.wg.Done()
 
 	tickInterval := 50 * time.Millisecond
