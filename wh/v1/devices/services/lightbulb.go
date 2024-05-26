@@ -14,8 +14,8 @@ type Lightbulb struct {
 	*Generic
 	On         *attributes.Bool     // required
 	Brightness *attributes.Int      // optional
-	Saturation *attributes.Int      // optional
-	Hue        *attributes.Float    // optional
+	ColorTemp  *attributes.Int      // optional
+	Color      *attributes.Color    // optional
 	Transition *attributes.Duration // optional
 }
 
@@ -26,15 +26,15 @@ func NewLightbulb(id string) *Lightbulb {
 		Generic:    newGeneric(id, clientsapi.Service_LIGHTBULB),
 		On:         attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required),
 		Brightness: attributes.NewInt("brightness", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),
-		Saturation: attributes.NewInt("saturation", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),
-		Hue:        attributes.NewFloat("hue", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 0.0, 360.0, 0.0, clientsapi.Unit_UNIT_ARC_DEGREES),
+		ColorTemp:  attributes.NewInt("color_temp", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, 153, 1000, 1, clientsapi.Unit_UNIT_MIREDS),
+		Color:      attributes.NewColor("color", clientsapi.Permissions_PERM_READWRITE, attributes.Optional),
 		Transition: attributes.NewDuration("transition", clientsapi.Permissions_PERM_WRITEONLY, attributes.Optional, 0, 300*time.Second, time.Second),
 	}
 	srv.AddAttribute(
 		srv.On,
 		srv.Brightness,
-		srv.Saturation,
-		srv.Hue,
+		srv.ColorTemp,
+		srv.Color,
 		srv.Transition,
 	)
 	return srv
