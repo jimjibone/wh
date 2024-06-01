@@ -43,6 +43,7 @@ import (
 // }
 
 type Device struct {
+	log            *log.Context
 	id             string
 	typ            clientsapi.Device_DeviceType
 	sendState      func(state *clientsapi.Device)
@@ -56,6 +57,7 @@ type Device struct {
 func NewDevice(id string, typ clientsapi.Device_DeviceType) *Device {
 	ctx, close := context.WithCancel(context.Background())
 	dev := &Device{
+		log:            log.NewContext(log.DefaultLogger, id, log.DebugLevel),
 		id:             id,
 		typ:            typ,
 		services:       make(map[string]services.Service),
@@ -106,7 +108,6 @@ func (dev *Device) SendFullState() {
 	for _, srv := range dev.services {
 		pb.Services = append(pb.Services, srv.Pb())
 	}
-	log.Debugf("sending full state - id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(dev.services), services.PrettyServices("  ", pb.Services))
 	dev.deviceUpdates <- pb
 }
 
@@ -159,11 +160,11 @@ func (dev *Device) run(ctx context.Context) {
 				pb.Services = append(pb.Services, srv)
 			}
 
-			log.Debugf("sending update id:%q, typ:%q, services:%d\n%s", dev.id, dev.typ, len(cache), services.PrettyServices("  ", pb.Services))
 			if dev.sendState != nil {
+				dev.log.Debugf("sending service update typ:%q, services:%d\n%s", dev.typ, len(cache), services.PrettyServices("  ", pb.Services))
 				dev.sendState(pb)
 			} else {
-				panic(fmt.Sprintf("device %q is not registered with a client", dev.id))
+				dev.log.Debugf("warning not sending service update (device not registered with client) typ:%q, services:%d\n%s", dev.typ, len(cache), services.PrettyServices("  ", pb.Services))
 			}
 
 			// Reset the cache.
@@ -180,9 +181,10 @@ func (dev *Device) run(ctx context.Context) {
 		case state := <-dev.deviceUpdates:
 			resetCache()
 			if dev.sendState != nil {
+				dev.log.Debugf("sending full state typ:%q, services:%d\n%s", dev.typ, len(cache), services.PrettyServices("  ", state.Services))
 				dev.sendState(state)
 			} else {
-				panic(fmt.Sprintf("device %q is not registered with a client", dev.id))
+				dev.log.Debugf("warning not sending full state (device not registered with client) typ:%q, services:%d\n%s", dev.typ, len(cache), services.PrettyServices("  ", state.Services))
 			}
 
 		case update := <-dev.serviceUpdates:
