@@ -19,6 +19,7 @@ import (
 	"github.com/jimjibone/woodhouse-4/shared/random"
 	"github.com/jimjibone/woodhouse-4/shared/stores"
 	"github.com/jimjibone/woodhouse-4/wh/v1/devices"
+	"github.com/jimjibone/woodhouse-4/wh/v1/reactors"
 	"github.com/schollz/pake/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -41,6 +42,14 @@ type Client struct {
 	devicesMu sync.RWMutex               // locks the devices map only
 	devices   map[string]*devices.Device // key=id
 	updates   *queue.Queue[*clientsapi.Device]
+
+	reactorsEnabled bool
+	reactorsMu      sync.RWMutex // locks the reactors map only
+	reactors        map[string]*reactorDevice
+}
+
+type reactorDevice struct {
+	reactors map[*reactors.Device]struct{}
 }
 
 // Create a new woodhouse client. The store is used to keep pairing secrets
@@ -59,6 +68,8 @@ func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Cli
 
 		devices: make(map[string]*devices.Device),
 		updates: queue.New[*clientsapi.Device](),
+
+		reactors: make(map[string]*reactorDevice),
 	}
 
 	// Discard updates until we're connected to the server.
@@ -97,6 +108,13 @@ func WithConnectionHandler(handler ConnectionHandler) ClientOption {
 	}
 }
 
+// Enable the reactors functionality.
+func WithReactors() ClientOption {
+	return func(c *Client) {
+		c.reactorsEnabled = true
+	}
+}
+
 // Add a device to the client.
 func (client *Client) AddDevice(device *devices.Device) error {
 	client.devicesMu.Lock()
@@ -110,6 +128,40 @@ func (client *Client) AddDevice(device *devices.Device) error {
 	})
 	device.SendFullState()
 	return nil
+}
+
+// Add a reactor to the client.
+func (client *Client) AddReactor(device *reactors.Device) {
+	if !client.reactorsEnabled {
+		panic("reactors are not enabled")
+	}
+	if device.ID() == "" {
+		panic("reactor device has empty ID")
+	}
+	client.reactorsMu.Lock()
+	defer client.reactorsMu.Unlock()
+	if devs, found := client.reactors[device.ID()]; !found {
+		client.reactors[device.ID()] = &reactorDevice{reactors: map[*reactors.Device]struct{}{
+			device: {},
+		}}
+	} else {
+		devs.reactors[device] = struct{}{}
+	}
+}
+
+// Remove a reactor from the client.
+func (client *Client) RemoveReactor(device *reactors.Device) {
+	if !client.reactorsEnabled {
+		panic("reactors are not enabled")
+	}
+	client.reactorsMu.Lock()
+	defer client.reactorsMu.Unlock()
+	if devs, found := client.reactors[device.ID()]; found {
+		delete(devs.reactors, device)
+		if len(devs.reactors) == 0 {
+			delete(client.reactors, device.ID())
+		}
+	}
 }
 
 func (client *Client) Run() error {
@@ -550,6 +602,12 @@ func (client *Client) connect(ctx context.Context) bool {
 	go client.deviceFeedback(handlerCtx, handlerCancel, wg, conn)
 	go client.deviceControl(handlerCtx, handlerCancel, wg, conn)
 
+	// Start the reactor comms if enabled.
+	if client.reactorsEnabled {
+		wg.Add(1)
+		go client.reactorControl(handlerCtx, handlerCancel, wg, conn)
+	}
+
 	// Monitor the connection and return if it closes.
 	client.log.Debugf("connection complete")
 	ticker := time.NewTicker(5 * time.Second)
@@ -730,6 +788,56 @@ func (client *Client) deviceControl(ctx context.Context, close func(), wg *sync.
 					}
 				}
 			}()
+		}
+	}
+}
+
+func (client *Client) reactorControl(ctx context.Context, close func(), wg *sync.WaitGroup, conn *grpc.ClientConn) {
+	defer close()
+	defer wg.Done()
+
+	client.log.Infof("reactor control started")
+	defer client.log.Infof("reactor control finished")
+
+	service := clientsapi.NewClientServiceClient(conn)
+	stream, err := service.DeviceStream(ctx, &clientsapi.DeviceStreamRequest{})
+	if err != nil {
+		client.log.Errorf("failed to start reactor stream: %s", err)
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		update, err := stream.Recv()
+		if err != nil {
+			code := status.Code(err)
+			if code == codes.Unavailable || code == codes.Canceled {
+				client.log.Debugf("reactor stream closed: %s", err)
+			} else {
+				client.log.Errorf("failed to recv reactor request: %s", err)
+			}
+			return
+		} else {
+			// client.log.Debugf("received reactor update: %s", update)
+
+			// Find the reactors for this device update.
+			client.reactorsMu.RLock()
+			reacts, found := client.reactors[update.GetId()]
+			client.reactorsMu.RUnlock()
+
+			// If found then pass the update to the reactors.
+			if found {
+				for reactor := range reacts.reactors {
+					if reactor != nil {
+						reactor.HandleUpdate(update)
+					}
+				}
+			}
 		}
 	}
 }
