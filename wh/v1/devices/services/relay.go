@@ -20,6 +20,9 @@ type Relay struct {
 // New Relay service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "relay").
 func NewRelay(id string) *Relay {
+	if id == "" {
+		id = "relay"
+	}
 	srv := &Relay{
 		Generic:     newGeneric(id, clientsapi.Service_RELAY),
 		On:          attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required),

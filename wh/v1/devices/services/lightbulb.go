@@ -22,6 +22,9 @@ type Lightbulb struct {
 // New Lightbulb service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "lightbulb").
 func NewLightbulb(id string) *Lightbulb {
+	if id == "" {
+		id = "lightbulb"
+	}
 	srv := &Lightbulb{
 		Generic:    newGeneric(id, clientsapi.Service_LIGHTBULB),
 		On:         attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required),

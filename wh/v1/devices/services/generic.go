@@ -26,6 +26,9 @@ func NewGeneric(id string) *Generic {
 }
 
 func newGeneric(id string, typ clientsapi.Service_ServiceType) *Generic {
+	if id == "" {
+		id = "generic"
+	}
 	srv := &Generic{
 		id:    id,
 		typ:   typ,
