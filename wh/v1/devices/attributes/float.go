@@ -41,6 +41,10 @@ func (attr *Float) Get() float64 {
 	return attr.value
 }
 
+func (attr *Float) GetLimits() (min, max, step float64) {
+	return attr.min, attr.max, attr.step
+}
+
 func (attr *Float) Set(value float64) bool {
 	attr.isSet = true
 	if math.Abs(attr.value-value) > 0.0001 {
@@ -53,6 +57,17 @@ func (attr *Float) Set(value float64) bool {
 		return true
 	}
 	return false
+}
+
+func (attr *Float) SetLimits(min, max, step float64) {
+	attr.min = min
+	attr.max = max
+	attr.step = step
+	if attr.push != nil {
+		attr.push(attr.Pb())
+	} else {
+		panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
+	}
 }
 
 // HandleAction calls the attribute's OnAction handler if set.

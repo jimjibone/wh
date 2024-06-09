@@ -1,0 +1,36 @@
+package services
+
+import (
+	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
+	"github.com/jimjibone/woodhouse-4/wh/v1/devices/attributes"
+)
+
+// Static assert that Climate implements the Service interface.
+var _ Service = (*Climate)(nil)
+
+type Climate struct {
+	*Generic
+	HeatingSetpoint  *attributes.Float // required
+	LocalTemperature *attributes.Float // required
+	PIHeatingDemand  *attributes.Int   // optional
+}
+
+// New Climate service. The service ID must be unique within the device and is
+// normally the service name in lowercase (e.g. "climate").
+func NewClimate(id string) *Climate {
+	if id == "" {
+		id = "climate"
+	}
+	srv := &Climate{
+		Generic:          newGeneric(id, clientsapi.Service_CLIMATE),
+		HeatingSetpoint:  attributes.NewFloat("heating_setpoint", clientsapi.Permissions_PERM_READWRITE, attributes.Required, 5, 30, 0.5, clientsapi.Unit_UNIT_CELSIUS),
+		LocalTemperature: attributes.NewFloat("local_temperature", clientsapi.Permissions_PERM_READONLY, attributes.Required, 0, 0, 0, clientsapi.Unit_UNIT_CELSIUS),
+		PIHeatingDemand:  attributes.NewInt("pi_heating_demand", clientsapi.Permissions_PERM_READONLY, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),
+	}
+	srv.AddAttribute(
+		srv.HeatingSetpoint,
+		srv.LocalTemperature,
+		srv.PIHeatingDemand,
+	)
+	return srv
+}
