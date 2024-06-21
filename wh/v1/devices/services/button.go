@@ -10,7 +10,8 @@ var _ Service = (*Button)(nil)
 
 type Button struct {
 	*Generic
-	State *attributes.Enum // required
+	State    *attributes.Enum     // required
+	Duration *attributes.Duration // optional
 }
 
 // New Button service. The service ID must be unique within the device and is
@@ -20,11 +21,13 @@ func NewButton(id string) *Button {
 		id = "button"
 	}
 	srv := &Button{
-		Generic: newGeneric(id, clientsapi.Service_BUTTON),
-		State:   attributes.NewEnum("state", clientsapi.Permissions_PERM_READWRITE, attributes.Required),
+		Generic:  newGeneric(id, clientsapi.Service_BUTTON),
+		State:    attributes.NewEnum("state", clientsapi.Permissions_PERM_READONLY, attributes.Required),
+		Duration: attributes.NewDuration("duration", clientsapi.Permissions_PERM_READONLY, attributes.Optional, 0, 0, 0),
 	}
 	srv.AddAttribute(
 		srv.State,
+		srv.Duration,
 	)
 	return srv
 }
