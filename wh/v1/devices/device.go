@@ -52,6 +52,14 @@ type Device struct {
 	serviceUpdates chan *clientsapi.Service
 	wg             sync.WaitGroup
 	close          func()
+
+	// The device's info service. Note that the default info service will be
+	// overwritten if a new info service is provided via AddService.
+	Info *services.Info
+
+	// The device's online service. Note that the default online service will be
+	// overwritten if a new online service is provided via AddService.
+	Online *services.Online
 }
 
 func NewDevice(id string, typ clientsapi.Device_DeviceType) *Device {
@@ -64,9 +72,19 @@ func NewDevice(id string, typ clientsapi.Device_DeviceType) *Device {
 		deviceUpdates:  make(chan *clientsapi.Device, 1),
 		serviceUpdates: make(chan *clientsapi.Service, 1),
 		close:          close,
+		Info:           services.NewInfo(),
+		Online:         services.NewOnline(),
 	}
+
 	dev.wg.Add(1)
 	go dev.run(ctx)
+
+	// Set default name and online state for devices that don't explicitly
+	// implement them.
+	dev.AddService(dev.Info, dev.Online)
+	dev.Info.Name.Set(id)
+	dev.Online.Online.Set(true)
+
 	return dev
 }
 
@@ -78,6 +96,12 @@ func (dev *Device) Close() {
 // AddService adds the services to the device.
 func (dev *Device) AddService(srvs ...services.Service) {
 	for _, srv := range srvs {
+		if srv.Typ() == clientsapi.Service_INFO {
+			dev.Info = srv.(*services.Info)
+		}
+		if srv.Typ() == clientsapi.Service_ONLINE {
+			dev.Online = srv.(*services.Online)
+		}
 		srv.Push(dev.pusher)
 		dev.services[srv.ID()] = srv
 	}
