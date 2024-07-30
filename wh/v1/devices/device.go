@@ -130,7 +130,7 @@ func (dev *Device) HandleAction(request *clientsapi.ActionRequest, feedback func
 	if !found {
 		return fmt.Errorf("service not found")
 	}
-	return srv.Action(request, feedback)
+	return srv.HandleAction(request, feedback)
 }
 
 func (dev *Device) run(ctx context.Context) {
@@ -181,7 +181,7 @@ func (dev *Device) run(ctx context.Context) {
 		case state := <-dev.deviceUpdates:
 			resetCache()
 			if dev.sendState != nil {
-				dev.log.Debugf("sending full state typ:%q, services:%d\n%s", dev.typ, len(cache), services.PrettyServices("  ", state.Services))
+				dev.log.Debugf("sending full state typ:%q, services:%d\n%s", dev.typ, len(state.Services), services.PrettyServices("  ", state.Services))
 				dev.sendState(state)
 			} else {
 				dev.log.Debugf("warning not sending full state (device not registered with client) typ:%q, services:%d\n%s", dev.typ, len(cache), services.PrettyServices("  ", state.Services))

@@ -19,7 +19,8 @@ func ErrIncorrectTypeFor(attr attributes.Attribute) error {
 
 type Service interface {
 	ID() string
-	Action(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error
+	Typ() clientsapi.Service_ServiceType
+	HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error
 	Push(push func(*clientsapi.Service))
 	Pb() *clientsapi.Service
 }

@@ -50,11 +50,23 @@ func newGeneric(id string, typ clientsapi.Service_ServiceType) *Generic {
 					}
 					attr.HandleAction(req.GetBool())
 
+				case *attributes.Color:
+					if req.GetColor() == nil {
+						return ErrIncorrectTypeFor(attr)
+					}
+					attr.HandleAction(req.GetColor())
+
 				case *attributes.Duration:
 					if req.GetDuration() == nil {
 						return ErrIncorrectTypeFor(attr)
 					}
 					attr.HandleAction(req.GetDuration())
+
+				case *attributes.Enum:
+					if req.GetEnum() == nil {
+						return ErrIncorrectTypeFor(attr)
+					}
+					attr.HandleAction(req.GetEnum())
 
 				case *attributes.Float:
 					if req.GetFloat() == nil {
@@ -130,7 +142,11 @@ func (srv *Generic) ID() string {
 	return srv.id
 }
 
-func (srv *Generic) Action(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error {
+func (srv *Generic) Typ() clientsapi.Service_ServiceType {
+	return srv.typ
+}
+
+func (srv *Generic) HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error {
 	if srv.onAction != nil {
 		return srv.onAction(request, feedback)
 	}

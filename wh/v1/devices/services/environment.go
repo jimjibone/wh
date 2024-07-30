@@ -11,7 +11,7 @@ var _ Service = (*Environment)(nil)
 type Environment struct {
 	*Generic
 	Temperature *attributes.Float // optional
-	Humidity    *attributes.Float // required
+	Humidity    *attributes.Float // optional
 	Pressure    *attributes.Float // optional
 }
 
