@@ -15,6 +15,7 @@ type Generic struct {
 	attrs    map[string]attributes.Attribute
 	push     func(*clientsapi.Service)
 	onAction ActionHandler
+	onImage  ImageHandler
 }
 
 var _ Service = (*Generic)(nil)
@@ -49,6 +50,13 @@ func newGeneric(id string, typ clientsapi.Service_ServiceType) *Generic {
 						return ErrIncorrectTypeFor(attr)
 					}
 					attr.HandleAction(req.GetBool())
+
+				case *attributes.Image:
+					if req.GetImage() == nil {
+						return ErrIncorrectTypeFor(attr)
+					}
+					// attr.HandleAction(req.GetImage())
+					return fmt.Errorf("actions not supported for image")
 
 				case *attributes.Color:
 					if req.GetColor() == nil {
@@ -105,6 +113,24 @@ func newGeneric(id string, typ clientsapi.Service_ServiceType) *Generic {
 		}
 		return nil
 	}
+	srv.onImage = func(req *clientsapi.ImageRequest, feedback func(*clientsapi.ImageResponse)) ([]byte, error) {
+		attr, found := srv.attrs[req.GetAttributeId()]
+		if !found {
+			return nil, ErrAttributeNotFound
+		}
+
+		switch attr := attr.(type) {
+		case *attributes.Image:
+			data, err := attr.HandleImage()
+			if err != nil {
+				return nil, err
+			}
+			return data, nil
+
+		default:
+			return nil, ErrAttributeNotImage
+		}
+	}
 	return srv
 }
 
@@ -135,6 +161,19 @@ func (srv *Generic) OnAction(handler ActionHandler) {
 	srv.onAction = handler
 }
 
+// OnImage overrides the default image request handler. This is useful when
+// the implementer wants to provide additional progress feedback for requests,
+// such as SENT, TIMEOUT, etc.
+// The handler must parse the request and pass the request values to the service
+// attributes. The handler can send feedback at any time using the feedback func
+// and should eventually return when finished. When the handler returns a final
+// ImageResponse will be sent back. If the returned error is nil the response
+// status will be COMPLETE and the data field will be set with the returned byte
+// slice, otherwise ERR with the details field containing the error message.
+func (srv *Generic) OnImage(handler ImageHandler) {
+	srv.onImage = handler
+}
+
 // Static assert that Generic implements the Service interface.
 var _ Service = (*Generic)(nil)
 
@@ -151,6 +190,13 @@ func (srv *Generic) HandleAction(request *clientsapi.ActionRequest, feedback fun
 		return srv.onAction(request, feedback)
 	}
 	return fmt.Errorf("no action handler")
+}
+
+func (srv *Generic) HandleImage(request *clientsapi.ImageRequest, feedback func(*clientsapi.ImageResponse)) ([]byte, error) {
+	if srv.onImage != nil {
+		return srv.onImage(request, feedback)
+	}
+	return nil, fmt.Errorf("no image handler")
 }
 
 func (srv *Generic) Push(push func(*clientsapi.Service)) {

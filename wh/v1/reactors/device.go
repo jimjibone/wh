@@ -16,6 +16,9 @@ type Device struct {
 	button        *ButtonService
 	buttonHandler func(*ButtonService)
 
+	camera        *CameraService
+	cameraHandler func(*CameraService)
+
 	climate        *ClimateService
 	climateHandler func(*ClimateService)
 
@@ -89,6 +92,21 @@ func (dev *Device) OnButtonUpdated(handler func(*ButtonService)) {
 	dev.mu.Lock()
 	defer dev.mu.Unlock()
 	dev.buttonHandler = handler
+}
+
+// Get the camera service. Returns nil if the device does not have the camera
+// service or no updates have been received for the device yet.
+func (dev *Device) Camera() *CameraService {
+	dev.mu.RLock()
+	defer dev.mu.RUnlock()
+	return dev.camera
+}
+
+// Set a function to be called when the camera service is updated.
+func (dev *Device) OnCameraUpdated(handler func(*CameraService)) {
+	dev.mu.Lock()
+	defer dev.mu.Unlock()
+	dev.cameraHandler = handler
 }
 // Get the climate service. Returns nil if the device does not have the climate
 // service or no updates have been received for the device yet.
@@ -266,6 +284,18 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			if changed {
 				dev.buttonHandler(dev.button)
 			}
+
+		case clientsapi.Service_CAMERA:
+			dev.mu.Lock()
+			if dev.camera == nil {
+				dev.camera = &CameraService{}
+			}
+			changed := dev.camera.handleUpdate(service) && dev.cameraHandler != nil
+			dev.mu.Unlock()
+			if changed {
+				dev.cameraHandler(dev.camera)
+			}
+
 		case clientsapi.Service_CLIMATE:
 			dev.mu.Lock()
 			if dev.climate == nil {

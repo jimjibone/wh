@@ -11,6 +11,7 @@ import (
 var (
 	ErrReadOnly          = errors.New("write to read only attribute")
 	ErrAttributeNotFound = errors.New("attribute not found")
+	ErrAttributeNotImage = errors.New("attribute does not support image request")
 )
 
 func ErrIncorrectTypeFor(attr attributes.Attribute) error {
@@ -21,8 +22,11 @@ type Service interface {
 	ID() string
 	Typ() clientsapi.Service_ServiceType
 	HandleAction(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error
+	HandleImage(request *clientsapi.ImageRequest, feedback func(*clientsapi.ImageResponse)) ([]byte, error)
 	Push(push func(*clientsapi.Service))
 	Pb() *clientsapi.Service
 }
 
 type ActionHandler func(request *clientsapi.ActionRequest, feedback func(*clientsapi.ActionResponse)) error
+
+type ImageHandler func(request *clientsapi.ImageRequest, feedback func(*clientsapi.ImageResponse)) ([]byte, error)

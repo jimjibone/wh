@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"slices"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/jimjibone/queue/v2"
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
+	"github.com/jimjibone/woodhouse-4/apitools"
 	"github.com/jimjibone/woodhouse-4/log"
 	"github.com/jimjibone/woodhouse-4/shared/crypt"
 	"github.com/jimjibone/woodhouse-4/shared/random"
@@ -27,11 +30,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var (
+	ErrNotConnected = errors.New("not connected to server")
+)
+
 type Client struct {
 	log        *log.Context
 	store      *clientStore
 	serverAddr string
 	clientID   string
+	stopCtx    context.Context
+	stop       func()
 
 	minBackoff  time.Duration
 	maxBackoff  time.Duration
@@ -46,6 +55,11 @@ type Client struct {
 	reactorsEnabled bool
 	reactorsMu      sync.RWMutex // locks the reactors map only
 	reactors        map[string]*reactorDevice
+
+	imagesEnabled bool
+
+	serviceMu sync.RWMutex
+	service   clientsapi.ClientServiceClient
 }
 
 type reactorDevice struct {
@@ -71,6 +85,8 @@ func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Cli
 
 		reactors: make(map[string]*reactorDevice),
 	}
+
+	client.stopCtx, client.stop = context.WithCancel(context.Background())
 
 	// Discard updates until we're connected to the server.
 	client.updates.Discard(true)
@@ -112,6 +128,13 @@ func WithConnectionHandler(handler ConnectionHandler) ClientOption {
 func WithReactors() ClientOption {
 	return func(c *Client) {
 		c.reactorsEnabled = true
+	}
+}
+
+// Enable the images functionality.
+func WithImages() ClientOption {
+	return func(c *Client) {
+		c.imagesEnabled = true
 	}
 }
 
@@ -164,6 +187,61 @@ func (client *Client) RemoveReactor(device *reactors.Device) {
 	}
 }
 
+func (client *Client) RequestAction(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
+	if handler == nil {
+		panic("handler is nil")
+	}
+	client.serviceMu.RLock()
+	defer client.serviceMu.RUnlock()
+	if client.service == nil {
+		return ErrNotConnected
+	}
+	stream, err := client.service.SendAction(ctx, req)
+	if err != nil {
+		return err
+	}
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		handler(resp)
+	}
+}
+
+func (client *Client) RequestImage(ctx context.Context, req *clientsapi.ImageRequest, handler func(resp *clientsapi.ImageResponse)) error {
+	if handler == nil {
+		panic("handler is nil")
+	}
+	client.serviceMu.RLock()
+	defer client.serviceMu.RUnlock()
+	if client.service == nil {
+		return ErrNotConnected
+	}
+	stream, err := client.service.SendImageRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		handler(resp)
+	}
+}
+
+// Stops the client from running.
+func (client *Client) Stop() {
+	client.stop()
+}
+
 func (client *Client) Run() error {
 	// Upgrade the store to the latest schema.
 	err := client.store.Upgrade(client.log)
@@ -206,7 +284,7 @@ func (client *Client) Run() error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	signal.Notify(c, syscall.SIGTERM)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(client.stopCtx)
 	defer cancel()
 	go func() {
 		<-c
@@ -570,6 +648,16 @@ func (client *Client) connect(ctx context.Context) bool {
 	}
 	defer conn.Close()
 
+	// Create a client service client which can be used by request methods.
+	client.serviceMu.Lock()
+	client.service = clientsapi.NewClientServiceClient(conn)
+	client.serviceMu.Unlock()
+	defer func() {
+		client.serviceMu.Lock()
+		client.service = nil
+		client.serviceMu.Unlock()
+	}()
+
 	// Start the auth (fetches a new access token).
 	err = auth.Start(conn)
 	if err != nil {
@@ -601,6 +689,12 @@ func (client *Client) connect(ctx context.Context) bool {
 	wg.Add(2)
 	go client.deviceFeedback(handlerCtx, handlerCancel, wg, conn)
 	go client.deviceControl(handlerCtx, handlerCancel, wg, conn)
+
+	// Start the images comms if enabled.
+	if client.imagesEnabled {
+		wg.Add(1)
+		go client.imagesControl(handlerCtx, handlerCancel, wg, conn)
+	}
 
 	// Start the reactor comms if enabled.
 	if client.reactorsEnabled {
@@ -838,6 +932,90 @@ func (client *Client) reactorControl(ctx context.Context, close func(), wg *sync
 					}
 				}
 			}
+		}
+	}
+}
+
+func (client *Client) imagesControl(ctx context.Context, close func(), wg *sync.WaitGroup, conn *grpc.ClientConn) {
+	defer close()
+	defer wg.Done()
+
+	client.log.Infof("image control started")
+	defer client.log.Infof("image control finished")
+
+	service := clientsapi.NewClientServiceClient(conn)
+	stream, err := service.ImageStream(ctx)
+	if err != nil {
+		client.log.Errorf("failed to start image stream: %s", err)
+		return
+	}
+
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			code := status.Code(err)
+			if code == codes.Unavailable || code == codes.Canceled {
+				client.log.Debugf("image stream closed: %s", err)
+			} else {
+				client.log.Errorf("failed to recv image request: %s", err)
+			}
+			return
+		} else {
+			client.log.Debugf("received image request: %s", req)
+
+			// Find the device.
+			client.devicesMu.RLock()
+			dev, found := client.devices[req.GetDeviceId()]
+			client.devicesMu.RUnlock()
+			if !found {
+				err := stream.Send(&clientsapi.ImageResponse{
+					RequestId: req.GetRequestId(),
+					Status:    clientsapi.ImageResponse_ERROR,
+					Details:   "device not found",
+				})
+				if err != nil {
+					client.log.Errorf("failed to send image response: %s", err)
+				}
+			}
+
+			// Let the device handle it in another goroutine.
+			go func() {
+				lastStatus := clientsapi.ImageResponse_UNDEFINED
+				data, err := dev.HandleImage(req, func(res *clientsapi.ImageResponse) {
+					client.log.Debugf("sending image response: %s", apitools.ImageResponseString(res))
+					lastStatus = res.Status
+					err := stream.Send(res)
+					if err != nil {
+						client.log.Errorf("failed to send image response: %s", err)
+					}
+				})
+				if err != nil {
+					client.log.Debugf("sending image error response: %s", err)
+					err := stream.Send(&clientsapi.ImageResponse{
+						RequestId: req.GetRequestId(),
+						Status:    clientsapi.ImageResponse_ERROR,
+						Details:   err.Error(),
+					})
+					if err != nil {
+						client.log.Errorf("failed to send image error response: %s", err)
+					}
+				} else {
+					// Auto return complete if no other final status was sent.
+					if lastStatus < clientsapi.ImageResponse_COMPLETE {
+						res := &clientsapi.ImageResponse{
+							RequestId: req.GetRequestId(),
+							Status:    clientsapi.ImageResponse_COMPLETE,
+							Details:   "",
+							Data:      data,
+						}
+						client.log.Debugf("sending image auto response: %s", apitools.ImageResponseString(res))
+						err := stream.Send(res)
+						if err != nil {
+							client.log.Errorf("failed to send image auto response: %s", err)
+						}
+					}
+				}
+			}()
 		}
 	}
 }

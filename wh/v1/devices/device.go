@@ -133,6 +133,25 @@ func (dev *Device) HandleAction(request *clientsapi.ActionRequest, feedback func
 	return srv.HandleAction(request, feedback)
 }
 
+// HandleImage is called in its own goroutine when an ImageRequest is
+// received from the server. During this the implementer should forward the
+// request to the contained services and attributes. The implementer is
+// responsible for ensuring safety of concurrency. During this time the
+// implementer may send ImageResponse feedback at any time using the
+// feedback func, which is useful if the request has the potential to take a
+// long time or timeout, for example. When the function returns a final
+// ImageResponse will be sent back to the server. If the returned error is
+// nil the response status will be COMPLETE and the data field will be set with
+// the returned byte slice, otherwise ERR with the details field containing the
+// error message.
+func (dev *Device) HandleImage(request *clientsapi.ImageRequest, feedback func(*clientsapi.ImageResponse)) ([]byte, error) {
+	srv, found := dev.services[request.GetServiceId()]
+	if !found {
+		return nil, fmt.Errorf("service not found")
+	}
+	return srv.HandleImage(request, feedback)
+}
+
 func (dev *Device) run(ctx context.Context) {
 	defer dev.wg.Done()
 
