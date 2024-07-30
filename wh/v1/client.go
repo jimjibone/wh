@@ -783,6 +783,13 @@ func (client *Client) deviceFeedback(ctx context.Context, close func(), wg *sync
 	}
 	client.devicesMu.RUnlock()
 
+	// Wait for errors.
+	go func() {
+		err := stream.RecvMsg(nil)
+		client.log.Errorf("failed to send device update: %s", err)
+		close()
+	}()
+
 	// Now wait for updates.
 	for {
 		select {
@@ -797,7 +804,7 @@ func (client *Client) deviceFeedback(ctx context.Context, close func(), wg *sync
 				},
 			})
 			if err != nil {
-				client.log.Errorf("failed to send device update: %s", err)
+				client.log.Errorf("failed to send device %q update: %s", update.Id, err)
 			}
 		}
 	}
