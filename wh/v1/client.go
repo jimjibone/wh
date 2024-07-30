@@ -856,7 +856,11 @@ func (client *Client) deviceControl(ctx context.Context, close func(), wg *sync.
 			go func() {
 				lastStatus := clientsapi.ActionResponse_UNDEFINED
 				err := dev.HandleAction(req, func(res *clientsapi.ActionResponse) {
-					client.log.Debugf("sending action response: %s", res)
+					str := res.String()
+					if len(str) > 1000 {
+						str = str[:1000]
+					}
+					client.log.Debugf("sending action response: %s", str)
 					lastStatus = res.Status
 					err := stream.Send(res)
 					if err != nil {
