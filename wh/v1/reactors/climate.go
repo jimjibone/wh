@@ -1,10 +1,16 @@
 package reactors
 
 import (
+	"context"
+	"fmt"
+
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
+	"github.com/jimjibone/woodhouse-4/log"
 )
 
 type ClimateService struct {
+	requester        Requester
+	id               string
 	heatingSetpoint  float64
 	localTemperature float64
 	piHeatingDemand  *int64
@@ -12,6 +18,7 @@ type ClimateService struct {
 
 func (srv *ClimateService) handleUpdate(update *clientsapi.Service) bool {
 	changed := false
+	srv.id = update.GetId()
 	for _, attr := range update.Attrs {
 		switch attr.GetId() {
 		case "heating_setpoint":
@@ -44,6 +51,29 @@ func (srv *ClimateService) HeatingSetpoint() float64 {
 		return 0
 	}
 	return srv.heatingSetpoint
+}
+
+func (srv *ClimateService) SetHeatingSetpoint(ctx context.Context, val float64) error {
+	if srv == nil {
+		return fmt.Errorf("service not initialised")
+	}
+	return srv.requester(
+		ctx,
+		&clientsapi.ActionRequest{
+			ServiceId: srv.id,
+			Values: []*clientsapi.Value{
+				{
+					Id: "heating_setpoint",
+					Float: &clientsapi.FloatValue{
+						Value: val,
+					},
+				},
+			},
+		},
+		func(resp *clientsapi.ActionResponse) {
+			log.Warnf("action resp: %v", resp)
+		},
+	)
 }
 
 func (srv *ClimateService) LocalTemperature() float64 {

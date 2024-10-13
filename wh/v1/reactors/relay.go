@@ -1,10 +1,16 @@
 package reactors
 
 import (
+	"context"
+	"fmt"
+
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
+	"github.com/jimjibone/woodhouse-4/log"
 )
 
 type RelayService struct {
+	requester   Requester
+	id          string
 	on          bool
 	voltage     *float64
 	current     *float64
@@ -14,6 +20,7 @@ type RelayService struct {
 
 func (srv *RelayService) handleUpdate(update *clientsapi.Service) bool {
 	changed := false
+	srv.id = update.GetId()
 	for _, attr := range update.Attrs {
 		switch attr.GetId() {
 		case "on":
@@ -67,6 +74,29 @@ func (srv *RelayService) On() bool {
 		return false
 	}
 	return srv.on
+}
+
+func (srv *RelayService) SetOn(ctx context.Context, on bool) error {
+	if srv == nil {
+		return fmt.Errorf("service not initialised")
+	}
+	return srv.requester(
+		ctx,
+		&clientsapi.ActionRequest{
+			ServiceId: srv.id,
+			Values: []*clientsapi.Value{
+				{
+					Id: "on",
+					Bool: &clientsapi.BoolValue{
+						Value: on,
+					},
+				},
+			},
+		},
+		func(resp *clientsapi.ActionResponse) {
+			log.Warnf("action resp: %v", resp)
+		},
+	)
 }
 
 func (srv *RelayService) HasVoltage() bool {

@@ -1,14 +1,18 @@
 package reactors
 
 import (
+	"context"
 	"sync"
 
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
 )
 
+type Requester func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error
+
 type Device struct {
-	mu sync.RWMutex
-	id string
+	mu        sync.RWMutex
+	requester Requester
+	id        string
 
 	battery        *BatteryService
 	batteryHandler func(*BatteryService)
@@ -19,8 +23,8 @@ type Device struct {
 	camera        *CameraService
 	cameraHandler func(*CameraService)
 
-	climate        *ClimateService
-	climateHandler func(*ClimateService)
+	climate        map[string]*ClimateService
+	climateHandler map[string]func(*ClimateService)
 
 	contact        *ContactService
 	contactHandler func(*ContactService)
@@ -43,8 +47,8 @@ type Device struct {
 	online        *OnlineService
 	onlineHandler func(*OnlineService)
 
-	relay        *RelayService
-	relayHandler func(*RelayService)
+	relay        map[string]*RelayService
+	relayHandler map[string]func(*RelayService)
 
 	update        *UpdateService
 	updateHandler func(*UpdateService)
@@ -55,6 +59,13 @@ func NewDevice(id string) *Device {
 		id: id,
 	}
 	return dev
+}
+
+// Internal use only. Initialises the device.
+func (dev *Device) Init(requester Requester) {
+	dev.mu.Lock()
+	defer dev.mu.Unlock()
+	dev.requester = requester
 }
 
 // Get the ID of the device.
@@ -108,19 +119,26 @@ func (dev *Device) OnCameraUpdated(handler func(*CameraService)) {
 	defer dev.mu.Unlock()
 	dev.cameraHandler = handler
 }
-// Get the climate service. Returns nil if the device does not have the climate
-// service or no updates have been received for the device yet.
-func (dev *Device) Climate() *ClimateService {
+
+// Get the climate service by ID. Returns nil if the device does not have the
+// climate service that ID or no updates have been received for the device yet.
+func (dev *Device) Climate(id string) *ClimateService {
 	dev.mu.RLock()
 	defer dev.mu.RUnlock()
-	return dev.climate
+	if dev.climate != nil {
+		return dev.climate[id]
+	}
+	return nil
 }
 
 // Set a function to be called when the climate service is updated.
-func (dev *Device) OnClimateUpdated(handler func(*ClimateService)) {
+func (dev *Device) OnClimateUpdated(id string, handler func(*ClimateService)) {
 	dev.mu.Lock()
 	defer dev.mu.Unlock()
-	dev.climateHandler = handler
+	if dev.climateHandler == nil {
+		dev.climateHandler = make(map[string]func(*ClimateService))
+	}
+	dev.climateHandler[id] = handler
 }
 
 // Get the contact service. Returns nil if the device does not have the contact
@@ -228,19 +246,25 @@ func (dev *Device) OnOnlineUpdated(handler func(*OnlineService)) {
 	dev.onlineHandler = handler
 }
 
-// Get the relay service. Returns nil if the device does not have the relay
-// service or no updates have been received for the device yet.
-func (dev *Device) Relay() *RelayService {
+// Get the relay service by ID. Returns nil if the device does not have the
+// relay service that ID or no updates have been received for the device yet.
+func (dev *Device) Relay(id string) *RelayService {
 	dev.mu.RLock()
 	defer dev.mu.RUnlock()
-	return dev.relay
+	if dev.relay != nil {
+		return dev.relay[id]
+	}
+	return nil
 }
 
 // Set a function to be called when the relay service is updated.
-func (dev *Device) OnRelayUpdated(handler func(*RelayService)) {
+func (dev *Device) OnRelayUpdated(id string, handler func(*RelayService)) {
 	dev.mu.Lock()
 	defer dev.mu.Unlock()
-	dev.relayHandler = handler
+	if dev.relayHandler == nil {
+		dev.relayHandler = make(map[string]func(*RelayService))
+	}
+	dev.relayHandler[id] = handler
 }
 
 // Get the update service. Returns nil if the device does not have the update
@@ -262,6 +286,7 @@ func (dev *Device) OnUpdateUpdated(handler func(*UpdateService)) {
 // device.
 func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 	for _, service := range update.Services {
+		id := service.GetId()
 		switch service.GetTyp() {
 		case clientsapi.Service_BATTERY:
 			dev.mu.Lock()
@@ -299,12 +324,18 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 		case clientsapi.Service_CLIMATE:
 			dev.mu.Lock()
 			if dev.climate == nil {
-				dev.climate = &ClimateService{}
+				dev.climate = make(map[string]*ClimateService)
 			}
-			changed := dev.climate.handleUpdate(service) && dev.climateHandler != nil
+			if dev.climate[id] == nil {
+				dev.climate[id] = &ClimateService{requester: func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
+					req.DeviceId = dev.id
+					return dev.requester(ctx, req, handler)
+				}}
+			}
+			changed := dev.climate[id].handleUpdate(service)
 			dev.mu.Unlock()
-			if changed {
-				dev.climateHandler(dev.climate)
+			if changed && dev.climateHandler[id] != nil {
+				dev.climateHandler[id](dev.climate[id])
 			}
 
 		case clientsapi.Service_CONTACT:
@@ -387,12 +418,18 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 		case clientsapi.Service_RELAY:
 			dev.mu.Lock()
 			if dev.relay == nil {
-				dev.relay = &RelayService{}
+				dev.relay = make(map[string]*RelayService)
 			}
-			changed := dev.relay.handleUpdate(service) && dev.relayHandler != nil
+			if dev.relay[id] == nil {
+				dev.relay[id] = &RelayService{requester: func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
+					req.DeviceId = dev.id
+					return dev.requester(ctx, req, handler)
+				}}
+			}
+			changed := dev.relay[id].handleUpdate(service)
 			dev.mu.Unlock()
-			if changed {
-				dev.relayHandler(dev.relay)
+			if changed && dev.relayHandler[id] != nil {
+				dev.relayHandler[id](dev.relay[id])
 			}
 
 		case clientsapi.Service_UPDATE:

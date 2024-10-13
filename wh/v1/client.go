@@ -161,6 +161,7 @@ func (client *Client) AddReactor(device *reactors.Device) {
 	if device.ID() == "" {
 		panic("reactor device has empty ID")
 	}
+	device.Init(client.RequestAction)
 	client.reactorsMu.Lock()
 	defer client.reactorsMu.Unlock()
 	if devs, found := client.reactors[device.ID()]; !found {
