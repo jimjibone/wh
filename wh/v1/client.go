@@ -173,6 +173,13 @@ func (client *Client) AddReactor(device *reactors.Device) {
 	}
 }
 
+// Add a reactor to the client.
+func (client *Client) AddReactors(devices ...*reactors.Device) {
+	for _, dev := range devices {
+		client.AddReactor(dev)
+	}
+}
+
 // Remove a reactor from the client.
 func (client *Client) RemoveReactor(device *reactors.Device) {
 	if !client.reactorsEnabled {
