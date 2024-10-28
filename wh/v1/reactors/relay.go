@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
-	"github.com/jimjibone/woodhouse-4/log"
 )
 
 type RelayService struct {
@@ -94,7 +93,6 @@ func (srv *RelayService) SetOn(ctx context.Context, on bool) error {
 			},
 		},
 		func(resp *clientsapi.ActionResponse) {
-			log.Warnf("action resp: %v", resp)
 		},
 	)
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
-	"github.com/jimjibone/woodhouse-4/log"
 )
 
 type ClimateService struct {
@@ -71,7 +70,6 @@ func (srv *ClimateService) SetHeatingSetpoint(ctx context.Context, val float64) 
 			},
 		},
 		func(resp *clientsapi.ActionResponse) {
-			log.Warnf("action resp: %v", resp)
 		},
 	)
 }
