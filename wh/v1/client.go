@@ -153,6 +153,13 @@ func (client *Client) AddDevice(device *devices.Device) error {
 	return nil
 }
 
+// Create and return a new reactor device and add it to the client.
+func (client *Client) NewReactor(id string) *reactors.Device {
+	device := reactors.NewDevice(id)
+	client.AddReactor(device)
+	return device
+}
+
 // Add a reactor to the client.
 func (client *Client) AddReactor(device *reactors.Device) {
 	if !client.reactorsEnabled {

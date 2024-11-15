@@ -56,6 +56,8 @@ type Device struct {
 	updateHandler func(*UpdateService)
 }
 
+// Create a new reactor device. You must add this to the client with client.AddReactor() for it to function.
+// Alternatively, use client.NewReactor().
 func NewDevice(id string) *Device {
 	dev := &Device{
 		id:   id,
