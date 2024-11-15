@@ -1,6 +1,9 @@
 package reactors
 
 import (
+	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
@@ -13,8 +16,44 @@ type LightbulbService struct {
 	brightness *int64
 	saturation *int64
 	hue        *float64
-	colorTemp  *float64
+	colorTemp  *int64
 	transition *time.Duration
+}
+
+type LightbulbRequest struct {
+	On         *bool
+	Brightness *int64
+	Saturation *int64
+	Hue        *float64
+	ColorTemp  *int64
+	Transition *time.Duration
+}
+
+func (l LightbulbRequest) String() string {
+	var vals []string
+	if l.On != nil {
+		if *l.On {
+			vals = append(vals, "on")
+		} else {
+			vals = append(vals, "off")
+		}
+	}
+	if l.Brightness != nil {
+		vals = append(vals, fmt.Sprintf("bri: %d%%", *l.Brightness))
+	}
+	if l.Hue != nil {
+		vals = append(vals, fmt.Sprintf("hue: %.0f°", *l.Hue))
+	}
+	if l.Saturation != nil {
+		vals = append(vals, fmt.Sprintf("sat: %d%%", *l.Saturation))
+	}
+	if l.ColorTemp != nil {
+		vals = append(vals, fmt.Sprintf("ct: %d mireds", *l.ColorTemp))
+	}
+	if l.Transition != nil {
+		vals = append(vals, fmt.Sprintf("dt: %s", *l.Transition))
+	}
+	return "{" + strings.Join(vals, ", ") + "}"
 }
 
 func (srv *LightbulbService) handleUpdate(update *clientsapi.Service) bool {
@@ -57,15 +96,84 @@ func (srv *LightbulbService) handleUpdate(update *clientsapi.Service) bool {
 
 		case "color_temp":
 			if srv.colorTemp == nil {
-				srv.colorTemp = new(float64)
+				srv.colorTemp = new(int64)
 			}
-			if *srv.colorTemp != attr.GetFloat().GetValue() {
+			if *srv.colorTemp != attr.GetInt().GetValue() {
 				changed = true
-				*srv.colorTemp = attr.GetFloat().GetValue()
+				*srv.colorTemp = attr.GetInt().GetValue()
 			}
 		}
 	}
 	return changed
+}
+
+func (srv *LightbulbService) Request(ctx context.Context, req LightbulbRequest, handler ...func(*clientsapi.ActionResponse)) error {
+	if srv == nil {
+		return fmt.Errorf("service not initialised")
+	}
+
+	var values []*clientsapi.Value
+	if req.On != nil {
+		values = append(values, &clientsapi.Value{
+			Id: "on",
+			Bool: &clientsapi.BoolValue{
+				Value: *req.On,
+			},
+		})
+	}
+	if req.Brightness != nil {
+		values = append(values, &clientsapi.Value{
+			Id: "brightness",
+			Int: &clientsapi.IntValue{
+				Value: *req.Brightness,
+			},
+		})
+	}
+	if req.Saturation != nil {
+		values = append(values, &clientsapi.Value{
+			Id: "saturation",
+			Int: &clientsapi.IntValue{
+				Value: *req.Saturation,
+			},
+		})
+	}
+	if req.Hue != nil {
+		values = append(values, &clientsapi.Value{
+			Id: "hue",
+			Float: &clientsapi.FloatValue{
+				Value: *req.Hue,
+			},
+		})
+	}
+	if req.ColorTemp != nil {
+		values = append(values, &clientsapi.Value{
+			Id: "color_temp",
+			Int: &clientsapi.IntValue{
+				Value: *req.ColorTemp,
+			},
+		})
+	}
+	if req.Transition != nil {
+		values = append(values, &clientsapi.Value{
+			Id: "transition",
+			Duration: &clientsapi.DurationValue{
+				Value: req.Transition.Milliseconds(),
+			},
+		})
+	}
+
+	handlerFunc := func(*clientsapi.ActionResponse) {}
+	if len(handler) > 0 {
+		handlerFunc = handler[0]
+	}
+	return srv.requester(
+		ctx,
+		&clientsapi.ActionRequest{
+			ServiceId: srv.id,
+			Values:    values,
+		},
+		handlerFunc,
+	)
 }
 
 func (srv *LightbulbService) On() bool {
@@ -73,6 +181,10 @@ func (srv *LightbulbService) On() bool {
 		return false
 	}
 	return srv.on
+}
+
+func (srv *LightbulbService) SetOn(ctx context.Context, on bool) error {
+	return srv.Request(ctx, LightbulbRequest{On: &on}, func(ar *clientsapi.ActionResponse) {})
 }
 
 func (srv *LightbulbService) HasBrightness() bool {
@@ -87,6 +199,10 @@ func (srv *LightbulbService) Brightness() int64 {
 		return 0
 	}
 	return *srv.brightness
+}
+
+func (srv *LightbulbService) SetBrightness(ctx context.Context, brightness int64) error {
+	return srv.Request(ctx, LightbulbRequest{Brightness: &brightness}, func(ar *clientsapi.ActionResponse) {})
 }
 
 func (srv *LightbulbService) HasSaturation() bool {
@@ -124,7 +240,7 @@ func (srv *LightbulbService) HasColorTemp() bool {
 	return true
 }
 
-func (srv *LightbulbService) ColorTemp() float64 {
+func (srv *LightbulbService) ColorTemp() int64 {
 	if srv == nil || srv.colorTemp == nil {
 		return 0.0
 	}
