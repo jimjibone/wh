@@ -23,10 +23,11 @@ const (
 type scheduleSun struct {
 	Location Location
 	SunPos   SunPos
+	Offset   time.Duration
 	Days     []time.Weekday
 }
 
-func ScheduleSunpos(location Location, sunriseSunset SunPos, days ...time.Weekday) scheduleSun {
+func ScheduleSunpos(location Location, sunriseSunset SunPos, offset time.Duration, days ...time.Weekday) scheduleSun {
 	sort.Slice(days, func(i, j int) bool {
 		return days[i] < days[j]
 	})
@@ -113,6 +114,7 @@ func (s scheduleSun) OnDay(t time.Time) (t2 time.Time) {
 	case Sunset:
 		t2 = set
 	}
+	t2 = t2.Add(s.Offset)
 	return t2
 }
 

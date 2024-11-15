@@ -1,6 +1,7 @@
 package apitools
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -81,4 +82,25 @@ func (s Schedule[T]) GetNext(t time.Time) (ScheduleEntry[T], time.Time) {
 		}
 	}
 	return curr, curr.Time.OnDay(t)
+}
+
+func (s Schedule[T]) Run(ctx context.Context, handler func(startTime time.Time, setting T)) {
+	setting, startTime := s.GetCurrent(time.Now())
+	handler(startTime, setting.Value)
+
+	startTime = time.Now()
+	for {
+		setting, nextTime := s.GetNext(startTime)
+		timer := time.NewTimer(nextTime.Sub(startTime))
+
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+
+		case now := <-timer.C:
+			handler(now, setting.Value)
+			startTime = now
+		}
+	}
 }
