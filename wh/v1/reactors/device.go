@@ -43,8 +43,8 @@ type Device struct {
 	input        *InputService
 	inputHandler func(*InputService)
 
-	lightbulb        *LightbulbService
-	lightbulbHandler func(*LightbulbService)
+	lightbulb        map[string]*LightbulbService
+	lightbulbHandler map[string]func(*LightbulbService)
 
 	online        *OnlineService
 	onlineHandler func(*OnlineService)
@@ -226,19 +226,25 @@ func (dev *Device) OnInputUpdated(handler func(*InputService)) {
 	dev.inputHandler = handler
 }
 
-// Get the lightbulb service. Returns nil if the device does not have the lightbulb
-// service or no updates have been received for the device yet.
-func (dev *Device) Lightbulb() *LightbulbService {
+// Get the lightbulb service by ID. Returns nil if the device does not have the
+// lightbulb service that ID or no updates have been received for the device yet.
+func (dev *Device) Lightbulb(id string) *LightbulbService {
 	dev.mu.RLock()
 	defer dev.mu.RUnlock()
-	return dev.lightbulb
+	if dev.lightbulb != nil {
+		return dev.lightbulb[id]
+	}
+	return nil
 }
 
 // Set a function to be called when the lightbulb service is updated.
-func (dev *Device) OnLightbulbUpdated(handler func(*LightbulbService)) {
+func (dev *Device) OnLightbulbUpdated(id string, handler func(*LightbulbService)) {
 	dev.mu.Lock()
 	defer dev.mu.Unlock()
-	dev.lightbulbHandler = handler
+	if dev.lightbulbHandler == nil {
+		dev.lightbulbHandler = make(map[string]func(*LightbulbService))
+	}
+	dev.lightbulbHandler[id] = handler
 }
 
 // Get the online service. Returns nil if the device does not have the online
@@ -406,12 +412,18 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 		case clientsapi.Service_LIGHTBULB:
 			dev.mu.Lock()
 			if dev.lightbulb == nil {
-				dev.lightbulb = &LightbulbService{}
+				dev.lightbulb = make(map[string]*LightbulbService)
 			}
-			changed := dev.lightbulb.handleUpdate(service) && dev.lightbulbHandler != nil
+			if dev.lightbulb[id] == nil {
+				dev.lightbulb[id] = &LightbulbService{requester: func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
+					req.DeviceId = dev.id
+					return dev.requester(ctx, req, handler)
+				}}
+			}
+			changed := dev.lightbulb[id].handleUpdate(service)
 			dev.mu.Unlock()
-			if changed {
-				dev.lightbulbHandler(dev.lightbulb)
+			if changed && dev.lightbulbHandler[id] != nil {
+				dev.lightbulbHandler[id](dev.lightbulb[id])
 			}
 
 		case clientsapi.Service_ONLINE:

@@ -7,6 +7,8 @@ import (
 )
 
 type LightbulbService struct {
+	requester  Requester
+	id         string
 	on         bool
 	brightness *int64
 	saturation *int64
@@ -17,6 +19,7 @@ type LightbulbService struct {
 
 func (srv *LightbulbService) handleUpdate(update *clientsapi.Service) bool {
 	changed := false
+	srv.id = update.GetId()
 	for _, attr := range update.Attrs {
 		switch attr.GetId() {
 		case "on":
