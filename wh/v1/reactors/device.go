@@ -13,6 +13,8 @@ type Device struct {
 	mu        sync.RWMutex
 	requester Requester
 	id        string
+	wait      chan struct{}
+	waitDone  bool
 
 	battery        *BatteryService
 	batteryHandler func(*BatteryService)
@@ -56,7 +58,8 @@ type Device struct {
 
 func NewDevice(id string) *Device {
 	dev := &Device{
-		id: id,
+		id:   id,
+		wait: make(chan struct{}),
 	}
 	return dev
 }
@@ -73,6 +76,11 @@ func (dev *Device) ID() string {
 	dev.mu.RLock()
 	defer dev.mu.RUnlock()
 	return dev.id
+}
+
+// Returns a channel which waits for the device to come online before it is closed.
+func (dev *Device) WaitForDevice() <-chan struct{} {
+	return dev.wait
 }
 
 // Get the battery service. Returns nil if the device does not have the battery
@@ -443,5 +451,10 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 				dev.updateHandler(dev.update)
 			}
 		}
+	}
+
+	if !dev.waitDone {
+		dev.waitDone = true
+		close(dev.wait)
 	}
 }
