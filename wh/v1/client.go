@@ -865,6 +865,7 @@ func (client *Client) deviceControl(ctx context.Context, close func(), wg *sync.
 				if err != nil {
 					client.log.Errorf("failed to send action response: %s", err)
 				}
+				continue
 			}
 
 			// Let the device handle it in another goroutine.
