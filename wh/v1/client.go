@@ -857,6 +857,7 @@ func (client *Client) deviceControl(ctx context.Context, close func(), wg *sync.
 			dev, found := client.devices[req.GetDeviceId()]
 			client.devicesMu.RUnlock()
 			if !found {
+				client.log.Errorf("device not found for action: %s", req)
 				err := stream.Send(&clientsapi.ActionResponse{
 					ActionId: req.GetActionId(),
 					Status:   clientsapi.ActionResponse_ERROR,
