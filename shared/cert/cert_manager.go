@@ -4,35 +4,35 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"fmt"
-	"os"
 
 	"github.com/jimjibone/woodhouse-4/log"
-	"github.com/jimjibone/woodhouse-4/shared/paths"
+	"github.com/jimjibone/woodhouse-4/shared/stores"
+)
+
+var (
+	storeCertPath = "woodhouse.crt"
+	storeKeyPath  = "woodhouse.key"
 )
 
 type CertManager struct {
-	certPath string
-	keyPath  string
-	cert     tls.Certificate
-	certPEM  []byte
+	store   stores.Store
+	cert    tls.Certificate
+	certPEM []byte
 }
 
-func NewCertManager(certPath, keyPath string) (*CertManager, error) {
-	keyPath = paths.AbsPathify(keyPath)
-	certPath = paths.AbsPathify(certPath)
+func NewCertManager(store stores.Store) (*CertManager, error) {
 	cm := &CertManager{
-		certPath: certPath,
-		keyPath:  keyPath,
+		store: store,
 	}
 
 	// Check for the cert and key files.
 	genKey := false
 	genCert := false
-	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+	if !store.Has(storeKeyPath) {
 		genKey = true
 		genCert = true
 	}
-	if _, err := os.Stat(certPath); os.IsNotExist(err) {
+	if !store.Has(storeCertPath) {
 		genCert = true
 	}
 
@@ -41,40 +41,60 @@ func NewCertManager(certPath, keyPath string) (*CertManager, error) {
 	var privKey *rsa.PrivateKey
 	var certBytes []byte
 	if genKey {
-		log.Infof("generating new private key %s", keyPath)
+		log.Infof("generating new private key")
 		if privKey, err = GeneratePrivKey(); err != nil {
 			return nil, fmt.Errorf("failed to generate private key: %w", err)
 		}
-		if err = SavePrivKey(privKey, keyPath); err != nil {
+		data, err := EncodePrivKey(privKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode private key: %w", err)
+		}
+		err = store.Set(storeKeyPath, data)
+		if err != nil {
 			return nil, fmt.Errorf("failed to save private key: %w", err)
 		}
 	}
 	if genCert {
 		if privKey == nil {
-			log.Debugf("loading existing private key %s", keyPath)
-			if privKey, err = LoadPrivKey(keyPath); err != nil {
+			log.Debugf("loading existing private key")
+			data, err := store.Get(storeKeyPath)
+			if err != nil {
 				return nil, fmt.Errorf("failed to load private key: %w", err)
+			}
+			privKey, err = DecodePrivKey(data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode private key: %w", err)
 			}
 		}
 
-		log.Infof("generating new certificate %s", certPath)
+		log.Infof("generating new certificate")
 		if certBytes, err = GenerateSelfSignedCert(privKey); err != nil {
 			return nil, fmt.Errorf("failed to generate cert: %w", err)
 		}
-		if err = SaveCert(certBytes, certPath); err != nil {
+		data, err := EncodeCert(certBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode cert: %w", err)
+		}
+		err = store.Set(storeCertPath, data)
+		if err != nil {
 			return nil, fmt.Errorf("failed to save cert: %w", err)
 		}
 	}
 
 	// Load the final cert and key.
-	cm.cert, err = tls.LoadX509KeyPair(certPath, keyPath)
+	certData, err := store.Get(storeCertPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load cert: %w", err)
+	}
+	keyData, err := store.Get(storeKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load private key: %w", err)
+	}
+	cm.cert, err = tls.X509KeyPair(certData, keyData)
 	if err != nil {
 		return nil, err
 	}
-	cm.certPEM, err = os.ReadFile(certPath)
-	if err != nil {
-		return nil, err
-	}
+	cm.certPEM = certData
 
 	return cm, nil
 }

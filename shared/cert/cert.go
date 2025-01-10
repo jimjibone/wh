@@ -1,6 +1,7 @@
 package cert
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -18,6 +19,20 @@ func LoadPrivKey(filename string) (*rsa.PrivateKey, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
+	privPEM, _ := pem.Decode(priv)
+	if privPEM.Type != "RSA PRIVATE KEY" {
+		return nil, fmt.Errorf("not an RSA private key")
+	}
+
+	privKey, err := x509.ParsePKCS1PrivateKey(privPEM.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse RSA private key: %w", err)
+	}
+
+	return privKey, nil
+}
+
+func DecodePrivKey(priv []byte) (*rsa.PrivateKey, error) {
 	privPEM, _ := pem.Decode(priv)
 	if privPEM.Type != "RSA PRIVATE KEY" {
 		return nil, fmt.Errorf("not an RSA private key")
@@ -57,6 +72,20 @@ func SavePrivKey(privKey *rsa.PrivateKey, filename string) error {
 		return err
 	}
 	return nil
+}
+
+func EncodePrivKey(privKey *rsa.PrivateKey) ([]byte, error) {
+	f := bytes.NewBuffer(nil)
+
+	// Encode the private key.
+	err := pem.Encode(f, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return f.Bytes(), nil
 }
 
 func GenerateSelfSignedCert(privKey *rsa.PrivateKey) ([]byte, error) {
@@ -105,4 +134,18 @@ func SaveCert(cert []byte, filename string) error {
 		return err
 	}
 	return nil
+}
+
+func EncodeCert(cert []byte) ([]byte, error) {
+	f := bytes.NewBuffer(nil)
+
+	// Encode the private key.
+	err := pem.Encode(f, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return f.Bytes(), nil
 }
