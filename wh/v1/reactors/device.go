@@ -37,6 +37,9 @@ type Device struct {
 	environment        *EnvironmentService
 	environmentHandler func(*EnvironmentService)
 
+	generic        map[string]*GenericService
+	genericHandler map[string]func(*GenericService)
+
 	info        *InfoService
 	infoHandler func(*InfoService)
 
@@ -194,6 +197,27 @@ func (dev *Device) OnEnvironmentUpdated(handler func(*EnvironmentService)) {
 	dev.mu.Lock()
 	defer dev.mu.Unlock()
 	dev.environmentHandler = handler
+}
+
+// Get the generic service by ID. Returns nil if the device does not have the
+// generic service that ID or no updates have been received for the device yet.
+func (dev *Device) Generic(id string) *GenericService {
+	dev.mu.RLock()
+	defer dev.mu.RUnlock()
+	if dev.generic != nil {
+		return dev.generic[id]
+	}
+	return nil
+}
+
+// Set a function to be called when the generic service is updated.
+func (dev *Device) OnGenericUpdated(id string, handler func(*GenericService)) {
+	dev.mu.Lock()
+	defer dev.mu.Unlock()
+	if dev.genericHandler == nil {
+		dev.genericHandler = make(map[string]func(*GenericService))
+	}
+	dev.genericHandler[id] = handler
 }
 
 // Get the info service. Returns nil if the device does not have the info
@@ -385,6 +409,25 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Unlock()
 			if changed {
 				dev.environmentHandler(dev.environment)
+			}
+
+		case clientsapi.Service_GENERIC:
+			dev.mu.Lock()
+			if dev.generic == nil {
+				dev.generic = make(map[string]*GenericService)
+			}
+			if dev.generic[id] == nil {
+				dev.generic[id] = newGenericService(
+					func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
+						req.DeviceId = dev.id
+						return dev.requester(ctx, req, handler)
+					},
+					id)
+			}
+			changed := dev.generic[id].handleUpdate(service)
+			dev.mu.Unlock()
+			if changed && dev.genericHandler[id] != nil {
+				dev.genericHandler[id](dev.generic[id])
 			}
 
 		case clientsapi.Service_INFO:
