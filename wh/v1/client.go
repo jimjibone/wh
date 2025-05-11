@@ -55,6 +55,7 @@ type Client struct {
 	reactorsEnabled bool
 	reactorsMu      sync.RWMutex // locks the reactors map only
 	reactors        map[string]*reactorDevice
+	Reactors        *ClientReactors
 
 	imagesEnabled bool
 
@@ -128,6 +129,7 @@ func WithConnectionHandler(handler ConnectionHandler) ClientOption {
 func WithReactors() ClientOption {
 	return func(c *Client) {
 		c.reactorsEnabled = true
+		c.Reactors = &ClientReactors{client: c}
 	}
 }
 
@@ -153,15 +155,35 @@ func (client *Client) AddDevice(device *devices.Device) error {
 	return nil
 }
 
-// Create and return a new reactor device and add it to the client.
-func (client *Client) NewReactor(id string) *reactors.Device {
+type ClientReactors struct {
+	client *Client
+}
+
+// Get a device reactor and add it to the client.
+func (cr *ClientReactors) GetDevice(id string) *reactors.Device {
 	device := reactors.NewDevice(id)
-	client.AddReactor(device)
+	cr.client.addReactor(device)
 	return device
 }
 
+// func (client *Client) NewReactor(id string) *reactors.Device {
+// 	device := reactors.NewDevice(id)
+// 	client.AddReactor(device)
+// 	return device
+// }
+
+func (cr *ClientReactors) WaitForDevices() {
+	cr.client.reactorsMu.RLock()
+	defer cr.client.reactorsMu.RUnlock()
+	for _, reactorDevs := range cr.client.reactors {
+		for dev := range reactorDevs.reactors {
+			<-dev.WaitForDevice()
+		}
+	}
+}
+
 // Add a reactor to the client.
-func (client *Client) AddReactor(device *reactors.Device) {
+func (client *Client) addReactor(device *reactors.Device) {
 	if !client.reactorsEnabled {
 		panic("reactors are not enabled")
 	}
@@ -181,14 +203,14 @@ func (client *Client) AddReactor(device *reactors.Device) {
 }
 
 // Add a reactor to the client.
-func (client *Client) AddReactors(devices ...*reactors.Device) {
+func (client *Client) addReactors(devices ...*reactors.Device) {
 	for _, dev := range devices {
-		client.AddReactor(dev)
+		client.addReactor(dev)
 	}
 }
 
 // Remove a reactor from the client.
-func (client *Client) RemoveReactor(device *reactors.Device) {
+func (client *Client) removeReactor(device *reactors.Device) {
 	if !client.reactorsEnabled {
 		panic("reactors are not enabled")
 	}
