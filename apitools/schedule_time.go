@@ -40,6 +40,8 @@ func ScheduleTime(hour, min, sec int, days ...time.Weekday) scheduleTime {
 	}
 }
 
+// Returns a time schedule after converting t to hours:minutes[:seconds], expected in that format. The hours use the 24
+// hour range. Seconds are optional. The function will return an error if there are any issues when parsing the string.
 func ScheduleTimeStr(t string, days ...time.Weekday) (scheduleTime, error) {
 	sort.Slice(days, func(i, j int) bool {
 		return days[i] < days[j]
@@ -72,6 +74,9 @@ func ScheduleTimeStr(t string, days ...time.Weekday) (scheduleTime, error) {
 	return s, nil
 }
 
+// Returns a time schedule after converting t to hours:minutes[:seconds], expected in that format. The hours use the 24
+// hour range. Seconds are optional. If there is an error when creating the time schedule this function will panic. If
+// you want to handle the error use ScheduleTimeStr.
 func MustScheduleTimeStr(t string, days ...time.Weekday) scheduleTime {
 	s, err := ScheduleTimeStr(t, days...)
 	if err != nil {
