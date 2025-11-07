@@ -1,6 +1,8 @@
 package services
 
 import (
+	"time"
+
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
 	"github.com/jimjibone/woodhouse-4/wh/v1/devices/attributes"
 )
@@ -10,9 +12,13 @@ var _ Service = (*Update)(nil)
 
 type Update struct {
 	*Generic
-	Available      *attributes.Bool // required
-	CurrentVersion *attributes.Text // optional
-	UpdateVersion  *attributes.Text // optional
+	Available      *attributes.Bool     // required
+	CurrentVersion *attributes.Text     // optional
+	UpdateVersion  *attributes.Text     // optional
+	StartUpdate    *attributes.Bool     // optional
+	Updating       *attributes.Bool     // optional
+	Progress       *attributes.Int      // optional
+	Remaining      *attributes.Duration // optional
 }
 
 // New Update service. The service ID must be unique within the device and is
@@ -26,11 +32,19 @@ func NewUpdate(id string) *Update {
 		Available:      attributes.NewBool("available", clientsapi.Permissions_PERM_READONLY, attributes.Required),
 		CurrentVersion: attributes.NewText("current_version", clientsapi.Permissions_PERM_READONLY, attributes.Optional),
 		UpdateVersion:  attributes.NewText("update_version", clientsapi.Permissions_PERM_READONLY, attributes.Optional),
+		StartUpdate:    attributes.NewBool("start_update", clientsapi.Permissions_PERM_WRITEONLY, attributes.Optional),
+		Updating:       attributes.NewBool("updating", clientsapi.Permissions_PERM_READONLY, attributes.Optional),
+		Progress:       attributes.NewInt("progress", clientsapi.Permissions_PERM_READONLY, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),
+		Remaining:      attributes.NewDuration("remaining", clientsapi.Permissions_PERM_READONLY, attributes.Optional, 0, time.Hour, time.Second),
 	}
 	srv.AddAttribute(
 		srv.Available,
 		srv.CurrentVersion,
 		srv.UpdateVersion,
+		srv.StartUpdate,
+		srv.Updating,
+		srv.Progress,
+		srv.Remaining,
 	)
 	return srv
 }
