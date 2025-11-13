@@ -8,21 +8,26 @@ import (
 )
 
 type GenericService struct {
-	requester Requester
 	id        string
-	bools     map[string]bool
-	floats    map[string]float64
+	onUpdate  func(changed bool)
+	requester requester
+	wait      *Waiter
+	onliner
+
+	bools  map[string]bool
+	floats map[string]float64
 }
 
-func newGenericService(req Requester, id string) *GenericService {
-	return &GenericService{
-		requester: req,
-		id:        id,
-		bools:     make(map[string]bool),
-		floats:    make(map[string]float64),
-	}
+// Initialises the service.
+func (srv *GenericService) init(serviceID string, requester requester) {
+	srv.id = serviceID
+	srv.requester = requester
+	srv.wait = NewWaiter()
+	srv.bools = make(map[string]bool)
+	srv.floats = make(map[string]float64)
 }
 
+// Handle the update. Returns true if the values changed.
 func (srv *GenericService) handleUpdate(update *clientsapi.Service) bool {
 	changed := false
 	srv.id = update.GetId()
@@ -49,7 +54,22 @@ func (srv *GenericService) handleUpdate(update *clientsapi.Service) bool {
 			}
 		}
 	}
+	if srv.onUpdate != nil {
+		srv.onUpdate(changed)
+	}
+	srv.wait.Done()
 	return changed
+}
+
+// Sets a handler to be called when the service is updated.
+func (srv *GenericService) OnUpdate(handler func(changed bool)) {
+	srv.onUpdate = handler
+	srv.onliner.onUpdate = handler
+}
+
+// Returns a channel which is closed when the initial state of the service is received.
+func (srv *GenericService) Ready() <-chan struct{} {
+	return srv.wait.Wait()
 }
 
 func (srv *GenericService) HasBool(id string) bool {

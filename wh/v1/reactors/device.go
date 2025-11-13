@@ -7,12 +7,10 @@ import (
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
 )
 
-type Requester func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error
-
 type Device struct {
 	mu        sync.RWMutex
-	requester Requester
 	id        string
+	requester requester
 	wait      chan struct{}
 	waitDone  bool
 
@@ -59,21 +57,19 @@ type Device struct {
 	updateHandler func(*UpdateService)
 }
 
-// Create a new reactor device. You must add this to the client with client.AddReactor() for it to function.
-// Alternatively, use client.NewReactor().
-func NewDevice(id string) *Device {
+// Create a new reactor device.
+func newDevice(id string, requester requester) *Device {
 	dev := &Device{
-		id:   id,
-		wait: make(chan struct{}),
+		id:        id,
+		requester: requester,
+		wait:      make(chan struct{}),
 	}
 	return dev
 }
 
-// Internal use only. Initialises the device.
-func (dev *Device) Init(requester Requester) {
-	dev.mu.Lock()
-	defer dev.mu.Unlock()
-	dev.requester = requester
+func (dev *Device) sendRequest(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
+	req.DeviceId = dev.id
+	return dev.requester(ctx, req, handler)
 }
 
 // Get the ID of the device.
@@ -287,7 +283,7 @@ func (dev *Device) OnOnlineUpdated(handler func(*OnlineService)) {
 }
 
 // Get the relay service by ID. Returns nil if the device does not have the
-// relay service that ID or no updates have been received for the device yet.
+// relay service for that ID or no updates have been received for the device yet.
 func (dev *Device) Relay(id string) *RelayService {
 	dev.mu.RLock()
 	defer dev.mu.RUnlock()
@@ -332,6 +328,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.battery == nil {
 				dev.battery = &BatteryService{}
+				dev.battery.init(id, dev.sendRequest)
 			}
 			changed := dev.battery.handleUpdate(service) && dev.batteryHandler != nil
 			dev.mu.Unlock()
@@ -343,6 +340,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.button == nil {
 				dev.button = &ButtonService{}
+				dev.button.init(id, dev.sendRequest)
 			}
 			changed := dev.button.handleUpdate(service) && dev.buttonHandler != nil
 			dev.mu.Unlock()
@@ -354,6 +352,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.camera == nil {
 				dev.camera = &CameraService{}
+				dev.camera.init(id, dev.sendRequest)
 			}
 			changed := dev.camera.handleUpdate(service) && dev.cameraHandler != nil
 			dev.mu.Unlock()
@@ -367,10 +366,9 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 				dev.climate = make(map[string]*ClimateService)
 			}
 			if dev.climate[id] == nil {
-				dev.climate[id] = &ClimateService{requester: func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
-					req.DeviceId = dev.id
-					return dev.requester(ctx, req, handler)
-				}}
+				srv := &ClimateService{}
+				srv.init(id, dev.sendRequest)
+				dev.climate[id] = srv
 			}
 			changed := dev.climate[id].handleUpdate(service)
 			dev.mu.Unlock()
@@ -382,6 +380,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.contact == nil {
 				dev.contact = &ContactService{}
+				dev.contact.init(id, dev.sendRequest)
 			}
 			changed := dev.contact.handleUpdate(service) && dev.contactHandler != nil
 			dev.mu.Unlock()
@@ -393,6 +392,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.enum == nil {
 				dev.enum = &EnumService{}
+				dev.enum.init(id, dev.sendRequest)
 			}
 			changed := dev.enum.handleUpdate(service) && dev.enumHandler != nil
 			dev.mu.Unlock()
@@ -404,6 +404,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.environment == nil {
 				dev.environment = &EnvironmentService{}
+				dev.environment.init(id, dev.sendRequest)
 			}
 			changed := dev.environment.handleUpdate(service) && dev.environmentHandler != nil
 			dev.mu.Unlock()
@@ -417,12 +418,9 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 				dev.generic = make(map[string]*GenericService)
 			}
 			if dev.generic[id] == nil {
-				dev.generic[id] = newGenericService(
-					func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
-						req.DeviceId = dev.id
-						return dev.requester(ctx, req, handler)
-					},
-					id)
+				srv := &GenericService{}
+				srv.init(id, dev.sendRequest)
+				dev.generic[id] = srv
 			}
 			changed := dev.generic[id].handleUpdate(service)
 			dev.mu.Unlock()
@@ -434,6 +432,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.info == nil {
 				dev.info = &InfoService{}
+				dev.info.init(id, dev.sendRequest)
 			}
 			changed := dev.info.handleUpdate(service) && dev.infoHandler != nil
 			dev.mu.Unlock()
@@ -445,6 +444,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.input == nil {
 				dev.input = &InputService{}
+				dev.input.init(id, dev.sendRequest)
 			}
 			changed := dev.input.handleUpdate(service) && dev.inputHandler != nil
 			dev.mu.Unlock()
@@ -458,10 +458,9 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 				dev.lightbulb = make(map[string]*LightbulbService)
 			}
 			if dev.lightbulb[id] == nil {
-				dev.lightbulb[id] = &LightbulbService{requester: func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
-					req.DeviceId = dev.id
-					return dev.requester(ctx, req, handler)
-				}}
+				srv := &LightbulbService{}
+				srv.init(id, dev.sendRequest)
+				dev.lightbulb[id] = srv
 			}
 			changed := dev.lightbulb[id].handleUpdate(service)
 			dev.mu.Unlock()
@@ -473,6 +472,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.online == nil {
 				dev.online = &OnlineService{}
+				dev.online.init(id, dev.sendRequest)
 			}
 			changed := dev.online.handleUpdate(service) && dev.onlineHandler != nil
 			dev.mu.Unlock()
@@ -486,10 +486,9 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 				dev.relay = make(map[string]*RelayService)
 			}
 			if dev.relay[id] == nil {
-				dev.relay[id] = &RelayService{requester: func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
-					req.DeviceId = dev.id
-					return dev.requester(ctx, req, handler)
-				}}
+				srv := &RelayService{}
+				srv.init(id, dev.sendRequest)
+				dev.relay[id] = srv
 			}
 			changed := dev.relay[id].handleUpdate(service)
 			dev.mu.Unlock()
@@ -501,6 +500,7 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Lock()
 			if dev.update == nil {
 				dev.update = &UpdateService{}
+				dev.update.init(id, dev.sendRequest)
 			}
 			changed := dev.update.handleUpdate(service) && dev.updateHandler != nil
 			dev.mu.Unlock()

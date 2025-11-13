@@ -8,8 +8,12 @@ import (
 )
 
 type RelayService struct {
-	requester   Requester
-	id          string
+	id        string
+	onUpdate  func(changed bool)
+	requester requester
+	wait      *Waiter
+	onliner
+
 	on          bool
 	voltage     *float64
 	current     *float64
@@ -17,6 +21,14 @@ type RelayService struct {
 	temperature *float64
 }
 
+// Initialises the service.
+func (srv *RelayService) init(serviceID string, requester requester) {
+	srv.id = serviceID
+	srv.requester = requester
+	srv.wait = NewWaiter()
+}
+
+// Handle the update. Returns true if the values changed.
 func (srv *RelayService) handleUpdate(update *clientsapi.Service) bool {
 	changed := false
 	srv.id = update.GetId()
@@ -65,7 +77,22 @@ func (srv *RelayService) handleUpdate(update *clientsapi.Service) bool {
 			}
 		}
 	}
+	if srv.onUpdate != nil {
+		srv.onUpdate(changed)
+	}
+	srv.wait.Done()
 	return changed
+}
+
+// Sets a handler to be called when the service is updated.
+func (srv *RelayService) OnUpdate(handler func(changed bool)) {
+	srv.onUpdate = handler
+	srv.onliner.onUpdate = handler
+}
+
+// Returns a channel which is closed when the initial state of the service is received.
+func (srv *RelayService) Ready() <-chan struct{} {
+	return srv.wait.Wait()
 }
 
 func (srv *RelayService) On() bool {

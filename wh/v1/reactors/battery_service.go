@@ -5,10 +5,22 @@ import (
 )
 
 type BatteryService struct {
+	id       string
+	onUpdate func(changed bool)
+	wait     *Waiter
+	onliner
+
 	level   int64
 	voltage *float64
 }
 
+// Initialises the service.
+func (srv *BatteryService) init(serviceID string, requester requester) {
+	srv.id = serviceID
+	srv.wait = NewWaiter()
+}
+
+// Handle the update. Returns true if the values changed.
 func (srv *BatteryService) handleUpdate(update *clientsapi.Service) bool {
 	changed := false
 	for _, attr := range update.Attrs {
@@ -29,7 +41,22 @@ func (srv *BatteryService) handleUpdate(update *clientsapi.Service) bool {
 			}
 		}
 	}
+	if srv.onUpdate != nil {
+		srv.onUpdate(changed)
+	}
+	srv.wait.Done()
 	return changed
+}
+
+// Sets a handler to be called when the service is updated.
+func (srv *BatteryService) OnUpdate(handler func(changed bool)) {
+	srv.onUpdate = handler
+	srv.onliner.onUpdate = handler
+}
+
+// Returns a channel which is closed when the initial state of the service is received.
+func (srv *BatteryService) Ready() <-chan struct{} {
+	return srv.wait.Wait()
 }
 
 func (srv *BatteryService) Level() int64 {
