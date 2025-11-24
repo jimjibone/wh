@@ -119,63 +119,63 @@ func (rc *Client) GetBattery(deviceID string, serviceID ...string) *BatteryServi
 // Get a button service reactor for the specified device ID. If serviceID is not defined the default of "button" will be used.
 func (rc *Client) GetButton(deviceID string, serviceID ...string) *ButtonService {
 	service := &ButtonService{}
-	rc.addService(deviceID, serviceID, "button", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "button", clientsapi.Service_BUTTON, service)
 	return service
 }
 
 // Get a camera service reactor for the specified device ID. If serviceID is not defined the default of "camera" will be used.
 func (rc *Client) GetCamera(deviceID string, serviceID ...string) *CameraService {
 	service := &CameraService{}
-	rc.addService(deviceID, serviceID, "camera", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "camera", clientsapi.Service_CAMERA, service)
 	return service
 }
 
 // Get a cliamte service reactor for the specified device ID. If serviceID is not defined the default of "cliamte" will be used.
 func (rc *Client) GetClimate(deviceID string, serviceID ...string) *ClimateService {
 	service := &ClimateService{}
-	rc.addService(deviceID, serviceID, "climate", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "climate", clientsapi.Service_CLIMATE, service)
 	return service
 }
 
 // Get a contact service reactor for the specified device ID. If serviceID is not defined the default of "contact" will be used.
 func (rc *Client) GetContact(deviceID string, serviceID ...string) *ContactService {
 	service := &ContactService{}
-	rc.addService(deviceID, serviceID, "contact", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "contact", clientsapi.Service_CONTACT, service)
 	return service
 }
 
 // Get a enum service reactor for the specified device ID. If serviceID is not defined the default of "enum" will be used.
 func (rc *Client) GetEnum(deviceID string, serviceID ...string) *EnumService {
 	service := &EnumService{}
-	rc.addService(deviceID, serviceID, "enum", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "enum", clientsapi.Service_ENUM, service)
 	return service
 }
 
 // Get a environment service reactor for the specified device ID. If serviceID is not defined the default of "environment" will be used.
 func (rc *Client) GetEnvironment(deviceID string, serviceID ...string) *EnvironmentService {
 	service := &EnvironmentService{}
-	rc.addService(deviceID, serviceID, "environment", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "environment", clientsapi.Service_ENVIRONMENT, service)
 	return service
 }
 
 // Get a generic service reactor for the specified device ID. If serviceID is not defined the default of "generic" will be used.
 func (rc *Client) GetGeneric(deviceID string, serviceID ...string) *GenericService {
 	service := &GenericService{}
-	rc.addService(deviceID, serviceID, "generic", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "generic", clientsapi.Service_GENERIC, service)
 	return service
 }
 
 // Get a info service reactor for the specified device ID. If serviceID is not defined the default of "info" will be used.
 func (rc *Client) GetInfo(deviceID string, serviceID ...string) *InfoService {
 	service := &InfoService{}
-	rc.addService(deviceID, serviceID, "info", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "info", clientsapi.Service_INFO, service)
 	return service
 }
 
 // Get a input service reactor for the specified device ID. If serviceID is not defined the default of "input" will be used.
 func (rc *Client) GetInput(deviceID string, serviceID ...string) *InputService {
 	service := &InputService{}
-	rc.addService(deviceID, serviceID, "input", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "input", clientsapi.Service_INPUT, service)
 	return service
 }
 
@@ -189,21 +189,21 @@ func (rc *Client) GetLightbulb(deviceID string, serviceID ...string) *LightbulbS
 // Get a online service reactor for the specified device ID. If serviceID is not defined the default of "online" will be used.
 func (rc *Client) GetOnline(deviceID string, serviceID ...string) *OnlineService {
 	service := &OnlineService{}
-	rc.addService(deviceID, serviceID, "online", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "online", clientsapi.Service_ONLINE, service)
 	return service
 }
 
 // Get a relay service reactor for the specified device ID. If serviceID is not defined the default of "relay" will be used.
 func (rc *Client) GetRelay(deviceID string, serviceID ...string) *RelayService {
 	service := &RelayService{}
-	rc.addService(deviceID, serviceID, "relay", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "relay", clientsapi.Service_RELAY, service)
 	return service
 }
 
 // Get a update service reactor for the specified device ID. If serviceID is not defined the default of "update" will be used.
 func (rc *Client) GetUpdate(deviceID string, serviceID ...string) *UpdateService {
 	service := &UpdateService{}
-	rc.addService(deviceID, serviceID, "update", clientsapi.Service_BATTERY, service)
+	rc.addService(deviceID, serviceID, "update", clientsapi.Service_UPDATE, service)
 	return service
 }
 
