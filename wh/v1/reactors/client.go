@@ -84,6 +84,8 @@ func (rc *Client) GetDevice(deviceID string) *Device {
 }
 
 func (rc *Client) addService(deviceID string, serviceIDs []string, defaultID string, typ clientsapi.Service_ServiceType, service Service) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
 	if deviceID == "" {
 		panic("device id must be defined")
 	}
