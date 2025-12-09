@@ -15,10 +15,6 @@ type onliner struct {
 	onUpdate func(changed bool)
 }
 
-func newOnliner() *onliner {
-	return &onliner{}
-}
-
 // Returns the name of the device for this service.
 func (srv *onliner) DeviceName() string {
 	return srv.name
@@ -42,7 +38,7 @@ func (srv *onliner) handleInfo(update *clientsapi.Service) bool {
 			switch attr.GetId() {
 			case "name":
 				if srv.name != attr.GetText().GetValue() {
-					changed = true
+					// changed = true
 					srv.name = attr.GetText().GetValue()
 				}
 			}
@@ -62,14 +58,14 @@ func (srv *onliner) handleOnline(update *clientsapi.Service) bool {
 			switch attr.GetId() {
 			case "online":
 				if srv.online != attr.GetBool().GetValue() {
-					changed = true
+					// changed = true
 					srv.online = attr.GetBool().GetValue()
 				}
 
 			case "last_seen":
 				t := timeFromPb(attr.GetTime())
 				if !srv.lastSeen.Equal(t) {
-					changed = true
+					//changed = true
 					srv.lastSeen = t
 				}
 			}
