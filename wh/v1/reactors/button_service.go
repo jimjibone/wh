@@ -1,6 +1,7 @@
 package reactors
 
 import (
+	"fmt"
 	"time"
 
 	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
@@ -100,4 +101,12 @@ func (srv *ButtonService) Duration() time.Duration {
 		return 0
 	}
 	return *srv.duration
+}
+
+func (srv *ButtonService) String() string {
+	return fmt.Sprintf("{state:%q, duration:%s}", srv.state, srv.duration)
+}
+
+func (srv *ButtonService) StringLong() string {
+	return fmt.Sprintf("{state:%q, duration:%s, options:%q}", srv.state, srv.duration, srv.options)
 }
