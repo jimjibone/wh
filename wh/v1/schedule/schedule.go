@@ -1,4 +1,4 @@
-package apitools
+package schedule
 
 import (
 	"context"
