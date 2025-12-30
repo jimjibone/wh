@@ -11,7 +11,7 @@ type GenericService struct {
 	id        string
 	onUpdate  func(changed bool)
 	requester requester
-	wait      *Waiter
+	exists    bool
 	onliner
 
 	bools  map[string]bool
@@ -22,7 +22,6 @@ type GenericService struct {
 func (srv *GenericService) init(serviceID string, requester requester) {
 	srv.id = serviceID
 	srv.requester = requester
-	srv.wait = NewWaiter()
 	srv.bools = make(map[string]bool)
 	srv.floats = make(map[string]float64)
 }
@@ -57,7 +56,7 @@ func (srv *GenericService) handleUpdate(update *clientsapi.Service) bool {
 	if srv.onUpdate != nil {
 		srv.onUpdate(changed)
 	}
-	srv.wait.Done()
+	srv.exists = true
 	return changed
 }
 
@@ -67,9 +66,10 @@ func (srv *GenericService) OnUpdate(handler func(changed bool)) {
 	srv.onliner.onUpdate = handler
 }
 
-// Returns a channel which is closed when the initial state of the service is received.
-func (srv *GenericService) Ready() <-chan struct{} {
-	return srv.wait.Wait()
+// Returns whether the service exists or not. May be false until the client
+// receives the initial state from the server.
+func (srv *GenericService) Exists() bool {
+	return srv.exists
 }
 
 func (srv *GenericService) HasBool(id string) bool {

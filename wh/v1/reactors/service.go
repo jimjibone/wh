@@ -23,8 +23,9 @@ type Service interface {
 	// Sets a handler to be called when the service is updated.
 	OnUpdate(handler func(changed bool))
 
-	// Returns a channel which is closed when the initial state of the service is received.
-	Ready() <-chan struct{}
+	// Returns whether the service exists or not. May be false until the client
+	// receives the initial state from the server.
+	Exists() bool
 
 	// Returns the name of the device for this service.
 	DeviceName() string

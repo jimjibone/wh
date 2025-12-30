@@ -10,7 +10,7 @@ type OnlineService struct {
 	id        string
 	onUpdate  func(changed bool)
 	requester requester
-	wait      *Waiter
+	exists    bool
 	onliner
 
 	online   bool
@@ -21,7 +21,6 @@ type OnlineService struct {
 func (srv *OnlineService) init(serviceID string, requester requester) {
 	srv.id = serviceID
 	srv.requester = requester
-	srv.wait = NewWaiter()
 }
 
 // Handle the update. Returns true if the values changed.
@@ -46,7 +45,7 @@ func (srv *OnlineService) handleUpdate(update *clientsapi.Service) bool {
 	if srv.onUpdate != nil {
 		srv.onUpdate(changed)
 	}
-	srv.wait.Done()
+	srv.exists = true
 	return changed
 }
 
@@ -56,9 +55,10 @@ func (srv *OnlineService) OnUpdate(handler func(changed bool)) {
 	srv.onliner.onUpdate = handler
 }
 
-// Returns a channel which is closed when the initial state of the service is received.
-func (srv *OnlineService) Ready() <-chan struct{} {
-	return srv.wait.Wait()
+// Returns whether the service exists or not. May be false until the client
+// receives the initial state from the server.
+func (srv *OnlineService) Exists() bool {
+	return srv.exists
 }
 
 // Returns true if the device for this service is online.

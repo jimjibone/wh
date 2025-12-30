@@ -8,14 +8,13 @@ import (
 type CameraService struct {
 	id       string
 	onUpdate func(changed bool)
-	wait     *Waiter
+	exists   bool
 	onliner
 }
 
 // Initialises the service.
 func (srv *CameraService) init(serviceID string, requester requester) {
 	srv.id = serviceID
-	srv.wait = NewWaiter()
 }
 
 // Handle the update. Returns true if the values changed.
@@ -49,7 +48,7 @@ func (srv *CameraService) handleUpdate(update *clientsapi.Service) bool {
 	if srv.onUpdate != nil {
 		srv.onUpdate(changed)
 	}
-	srv.wait.Done()
+	srv.exists = true
 	return changed
 }
 
@@ -59,7 +58,8 @@ func (srv *CameraService) OnUpdate(handler func(changed bool)) {
 	srv.onliner.onUpdate = handler
 }
 
-// Returns a channel which is closed when the initial state of the service is received.
-func (srv *CameraService) Ready() <-chan struct{} {
-	return srv.wait.Wait()
+// Returns whether the service exists or not. May be false until the client
+// receives the initial state from the server.
+func (srv *CameraService) Exists() bool {
+	return srv.exists
 }

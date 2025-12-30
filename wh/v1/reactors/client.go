@@ -8,6 +8,7 @@ import (
 	"github.com/jimjibone/woodhouse-4/log"
 	"github.com/jimjibone/woodhouse-4/shared/stores"
 	"github.com/jimjibone/woodhouse-4/wh/v1"
+	"github.com/jimjibone/woodhouse-4/wh/v1/waiter"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,6 +17,7 @@ import (
 type Client struct {
 	log    *log.Context
 	client *wh.Client
+	ready  *waiter.Waiter // ready when we're connected to the server and have received the first batch of device states
 
 	mu         sync.RWMutex
 	reactables map[string]*reactable
@@ -53,11 +55,17 @@ func (r *reactable) addService(service Service, typ clientsapi.Service_ServiceTy
 func NewClient(store stores.Store, serverAddr string, opts ...wh.ClientOption) *Client {
 	rc := &Client{
 		log:        log.NewContext(log.DefaultLogger, "reactor", log.DebugLevel),
+		ready:      waiter.NewWaiter(),
 		reactables: make(map[string]*reactable),
 	}
 	opts = append(opts, wh.WithConnectionHandler(rc.runloop))
 	rc.client = wh.NewClient(store, serverAddr, opts...)
 	return rc
+}
+
+// Returns a channel which is closed when the client connects to the server.
+func (rc *Client) Ready() <-chan struct{} {
+	return rc.ready.Wait()
 }
 
 func (rc *Client) Client() *wh.Client {

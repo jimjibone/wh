@@ -8,7 +8,7 @@ type EnumService struct {
 	id        string
 	onUpdate  func(changed bool)
 	requester requester
-	wait      *Waiter
+	exists    bool
 	onliner
 
 	value   string
@@ -19,7 +19,6 @@ type EnumService struct {
 func (srv *EnumService) init(serviceID string, requester requester) {
 	srv.id = serviceID
 	srv.requester = requester
-	srv.wait = NewWaiter()
 }
 
 // Handle the update. Returns true if the values changed.
@@ -48,7 +47,7 @@ func (srv *EnumService) handleUpdate(update *clientsapi.Service) bool {
 	if srv.onUpdate != nil {
 		srv.onUpdate(changed)
 	}
-	srv.wait.Done()
+	srv.exists = true
 	return changed
 }
 
@@ -58,9 +57,10 @@ func (srv *EnumService) OnUpdate(handler func(changed bool)) {
 	srv.onliner.onUpdate = handler
 }
 
-// Returns a channel which is closed when the initial state of the service is received.
-func (srv *EnumService) Ready() <-chan struct{} {
-	return srv.wait.Wait()
+// Returns whether the service exists or not. May be false until the client
+// receives the initial state from the server.
+func (srv *EnumService) Exists() bool {
+	return srv.exists
 }
 
 func (srv *EnumService) Value() string {

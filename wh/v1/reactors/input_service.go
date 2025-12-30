@@ -8,7 +8,7 @@ type InputService struct {
 	id        string
 	onUpdate  func(changed bool)
 	requester requester
-	wait      *Waiter
+	exists    bool
 	onliner
 
 	on bool
@@ -18,7 +18,6 @@ type InputService struct {
 func (srv *InputService) init(serviceID string, requester requester) {
 	srv.id = serviceID
 	srv.requester = requester
-	srv.wait = NewWaiter()
 }
 
 // Handle the update. Returns true if the values changed.
@@ -36,7 +35,7 @@ func (srv *InputService) handleUpdate(update *clientsapi.Service) bool {
 	if srv.onUpdate != nil {
 		srv.onUpdate(changed)
 	}
-	srv.wait.Done()
+	srv.exists = true
 	return changed
 }
 
@@ -46,9 +45,10 @@ func (srv *InputService) OnUpdate(handler func(changed bool)) {
 	srv.onliner.onUpdate = handler
 }
 
-// Returns a channel which is closed when the initial state of the service is received.
-func (srv *InputService) Ready() <-chan struct{} {
-	return srv.wait.Wait()
+// Returns whether the service exists or not. May be false until the client
+// receives the initial state from the server.
+func (srv *InputService) Exists() bool {
+	return srv.exists
 }
 
 func (srv *InputService) On() bool {

@@ -1,4 +1,4 @@
-package reactors
+package waiter
 
 // Waiter allows something to say when it's done so other things can wait for
 // it. It differs from a WaitGroup in that the owner can call Done many times,
@@ -10,8 +10,16 @@ type Waiter struct {
 
 // Create a new waiter.
 func NewWaiter() *Waiter {
-	return &Waiter{
-		c: make(chan struct{}),
+	w := &Waiter{done: true}
+	w.Reset()
+	return w
+}
+
+// Reset the waiter as not done.
+func (w *Waiter) Reset() {
+	if w.done {
+		w.done = false
+		w.c = make(chan struct{})
 	}
 }
 

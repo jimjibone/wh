@@ -11,7 +11,7 @@ type ClimateService struct {
 	id        string
 	onUpdate  func(changed bool)
 	requester requester
-	wait      *Waiter
+	exists    bool
 	onliner
 
 	heatingSetpoint  float64
@@ -23,7 +23,6 @@ type ClimateService struct {
 func (srv *ClimateService) init(serviceID string, requester requester) {
 	srv.id = serviceID
 	srv.requester = requester
-	srv.wait = NewWaiter()
 }
 
 // Handle the update. Returns true if the values changed.
@@ -57,7 +56,7 @@ func (srv *ClimateService) handleUpdate(update *clientsapi.Service) bool {
 	if srv.onUpdate != nil {
 		srv.onUpdate(changed)
 	}
-	srv.wait.Done()
+	srv.exists = true
 	return changed
 }
 
@@ -67,9 +66,10 @@ func (srv *ClimateService) OnUpdate(handler func(changed bool)) {
 	srv.onliner.onUpdate = handler
 }
 
-// Returns a channel which is closed when the initial state of the service is received.
-func (srv *ClimateService) Ready() <-chan struct{} {
-	return srv.wait.Wait()
+// Returns whether the service exists or not. May be false until the client
+// receives the initial state from the server.
+func (srv *ClimateService) Exists() bool {
+	return srv.exists
 }
 
 func (srv *ClimateService) HeatingSetpoint() float64 {
