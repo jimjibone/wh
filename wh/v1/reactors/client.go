@@ -226,11 +226,21 @@ func (rc *Client) runloop(ctx context.Context, conn *grpc.ClientConn) {
 	defer rc.log.Infof("stream finished")
 
 	service := clientsapi.NewClientServiceClient(conn)
-	stream, err := service.DeviceStream(ctx, &clientsapi.DeviceStreamRequest{})
+	stream, err := service.DeviceStream(ctx)
 	if err != nil {
 		rc.log.Errorf("failed to start reactor stream: %s", err)
 		return
 	}
+
+	// Send initial request to start the stream.
+	err = stream.Send(&clientsapi.DeviceStreamRequest{})
+	if err != nil {
+		rc.log.Errorf("failed to start reactor stream: %s", err)
+		return
+	}
+
+	// Reset the waiter on exit so clients can wait for reconnection.
+	defer rc.ready.Reset()
 
 	for {
 		select {
@@ -248,8 +258,14 @@ func (rc *Client) runloop(ctx context.Context, conn *grpc.ClientConn) {
 				rc.log.Errorf("failed to recv reactor request: %s", err)
 			}
 			return
+		}
+		if update.Id == "" {
+			// Detect when the full state has finished being streamed (the first
+			// empty message is our cue). Tell clients that the full state has
+			// been fetched from the server.
+			rc.ready.Done()
 		} else {
-			// rc.log.Debugf("received reactor update: %s", update)
+			// rc.log.Infof("received reactor update: %s", update)
 
 			// Find the reactors for this device update and let them handle it.
 			rc.mu.RLock()
