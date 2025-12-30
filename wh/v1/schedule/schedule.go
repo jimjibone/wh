@@ -84,11 +84,18 @@ func (s Schedule[T]) GetNext(t time.Time) (ScheduleEntry[T], time.Time) {
 	return curr, curr.Time.OnDay(t)
 }
 
-func (s Schedule[T]) Run(ctx context.Context, handler func(startTime time.Time, setting T)) {
-	setting, startTime := s.GetCurrent(time.Now())
-	handler(startTime, setting.Value)
+// Run the schedule until the context is cancelled. The handler will be called
+// whenver the schedule is triggered. The handler can be called immediately with
+// the current schedule state if doInit is set to true. When the handler is
+// called it is provided with the start time (when the current schedule value
+// began) and the current value.
+func (s Schedule[T]) Run(ctx context.Context, doInit bool, handler func(startTime time.Time, setting T)) {
+	if doInit {
+		setting, startTime := s.GetCurrent(time.Now())
+		handler(startTime, setting.Value)
+	}
 
-	startTime = time.Now()
+	startTime := time.Now()
 	for {
 		setting, nextTime := s.GetNext(startTime)
 		timer := time.NewTimer(nextTime.Sub(startTime))
