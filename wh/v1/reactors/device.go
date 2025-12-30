@@ -47,8 +47,14 @@ type Device struct {
 	lightbulb        map[string]*LightbulbService
 	lightbulbHandler map[string]func(*LightbulbService)
 
+	motion        map[string]*MotionService
+	motionHandler map[string]func(*MotionService)
+
 	online        *OnlineService
 	onlineHandler func(*OnlineService)
+
+	presence        map[string]*PresenceService
+	presenceHandler map[string]func(*PresenceService)
 
 	relay        map[string]*RelayService
 	relayHandler map[string]func(*RelayService)
@@ -267,6 +273,27 @@ func (dev *Device) OnLightbulbUpdated(id string, handler func(*LightbulbService)
 	dev.lightbulbHandler[id] = handler
 }
 
+// Get the motion service by ID. Returns nil if the device does not have the
+// motion service for that ID or no updates have been received for the device yet.
+func (dev *Device) Motion(id string) *MotionService {
+	dev.mu.RLock()
+	defer dev.mu.RUnlock()
+	if dev.motion != nil {
+		return dev.motion[id]
+	}
+	return nil
+}
+
+// Set a function to be called when the motion service is updated.
+func (dev *Device) OnMotionUpdated(id string, handler func(*MotionService)) {
+	dev.mu.Lock()
+	defer dev.mu.Unlock()
+	if dev.motionHandler == nil {
+		dev.motionHandler = make(map[string]func(*MotionService))
+	}
+	dev.motionHandler[id] = handler
+}
+
 // Get the online service. Returns nil if the device does not have the online
 // service or no updates have been received for the device yet.
 func (dev *Device) Online() *OnlineService {
@@ -280,6 +307,27 @@ func (dev *Device) OnOnlineUpdated(handler func(*OnlineService)) {
 	dev.mu.Lock()
 	defer dev.mu.Unlock()
 	dev.onlineHandler = handler
+}
+
+// Get the presence service by ID. Returns nil if the device does not have the
+// presence service for that ID or no updates have been received for the device yet.
+func (dev *Device) Presence(id string) *PresenceService {
+	dev.mu.RLock()
+	defer dev.mu.RUnlock()
+	if dev.presence != nil {
+		return dev.presence[id]
+	}
+	return nil
+}
+
+// Set a function to be called when the presence service is updated.
+func (dev *Device) OnPresenceUpdated(id string, handler func(*PresenceService)) {
+	dev.mu.Lock()
+	defer dev.mu.Unlock()
+	if dev.presenceHandler == nil {
+		dev.presenceHandler = make(map[string]func(*PresenceService))
+	}
+	dev.presenceHandler[id] = handler
 }
 
 // Get the relay service by ID. Returns nil if the device does not have the
@@ -468,6 +516,22 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 				dev.lightbulbHandler[id](dev.lightbulb[id])
 			}
 
+		case clientsapi.Service_MOTION:
+			dev.mu.Lock()
+			if dev.motion == nil {
+				dev.motion = make(map[string]*MotionService)
+			}
+			if dev.motion[id] == nil {
+				srv := &MotionService{}
+				srv.init(id, dev.sendRequest)
+				dev.motion[id] = srv
+			}
+			changed := dev.motion[id].handleUpdate(service)
+			dev.mu.Unlock()
+			if changed && dev.motionHandler[id] != nil {
+				dev.motionHandler[id](dev.motion[id])
+			}
+
 		case clientsapi.Service_ONLINE:
 			dev.mu.Lock()
 			if dev.online == nil {
@@ -478,6 +542,22 @@ func (dev *Device) HandleUpdate(update *clientsapi.Device) {
 			dev.mu.Unlock()
 			if changed {
 				dev.onlineHandler(dev.online)
+			}
+
+		case clientsapi.Service_PRESENCE:
+			dev.mu.Lock()
+			if dev.presence == nil {
+				dev.presence = make(map[string]*PresenceService)
+			}
+			if dev.presence[id] == nil {
+				srv := &PresenceService{}
+				srv.init(id, dev.sendRequest)
+				dev.presence[id] = srv
+			}
+			changed := dev.presence[id].handleUpdate(service)
+			dev.mu.Unlock()
+			if changed && dev.presenceHandler[id] != nil {
+				dev.presenceHandler[id](dev.presence[id])
 			}
 
 		case clientsapi.Service_RELAY:
