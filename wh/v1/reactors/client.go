@@ -196,10 +196,24 @@ func (rc *Client) GetLightbulb(deviceID string, serviceID ...string) *LightbulbS
 	return service
 }
 
+// Get a motion service reactor for the specified device ID. If serviceID is not defined the default of "motion" will be used.
+func (rc *Client) GetMotion(deviceID string, serviceID ...string) *MotionService {
+	service := &MotionService{}
+	rc.addService(deviceID, serviceID, "motion", clientsapi.Service_MOTION, service)
+	return service
+}
+
 // Get a online service reactor for the specified device ID. If serviceID is not defined the default of "online" will be used.
 func (rc *Client) GetOnline(deviceID string, serviceID ...string) *OnlineService {
 	service := &OnlineService{}
 	rc.addService(deviceID, serviceID, "online", clientsapi.Service_ONLINE, service)
+	return service
+}
+
+// Get a presence service reactor for the specified device ID. If serviceID is not defined the default of "presence" will be used.
+func (rc *Client) GetPresence(deviceID string, serviceID ...string) *PresenceService {
+	service := &PresenceService{}
+	rc.addService(deviceID, serviceID, "presence", clientsapi.Service_PRESENCE, service)
 	return service
 }
 
