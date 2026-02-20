@@ -37,9 +37,14 @@ type Client struct {
 	log        *log.Context
 	store      *clientStore
 	serverAddr string
-	clientID   string
-	stopCtx    context.Context
-	stop       func()
+
+	clientID          string
+	clientName        string
+	clientDescription string
+	clientVersion     string
+
+	stopCtx context.Context
+	stop    func()
 
 	minBackoff  time.Duration
 	maxBackoff  time.Duration
@@ -65,7 +70,11 @@ func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Cli
 		log:        log.NewContext(log.DefaultLogger, "client", log.DebugLevel),
 		store:      newClientStore(store),
 		serverAddr: serverAddr,
-		clientID:   "",
+
+		clientID:          "",
+		clientName:        "",
+		clientDescription: "",
+		clientVersion:     "",
 
 		minBackoff:  time.Second,
 		maxBackoff:  32 * time.Second,
@@ -91,11 +100,14 @@ type ClientOption func(*Client)
 
 type ConnectionHandler func(ctx context.Context, conn *grpc.ClientConn)
 
-// Sets the client ID manually. Overrides the default option of generating one
-// automatically.
-func WithClientID(id string) ClientOption {
+// Sets the client info manually. Overrides the default option of generating an
+// ID automatically.
+func WithClientInfo(id, name, description, version string) ClientOption {
 	return func(c *Client) {
 		c.clientID = id
+		c.clientName = name
+		c.clientDescription = description
+		c.clientVersion = version
 	}
 }
 
@@ -721,6 +733,19 @@ func (client *Client) deviceFeedback(ctx context.Context, close func(), wg *sync
 	if err != nil {
 		client.log.Errorf("failed to start status stream: %s", err)
 		return
+	}
+
+	// Send the client info to the server.
+	err = stream.Send(&clientsapi.StatusUpdate{
+		ClientInfo: &clientsapi.ClientInfo{
+			Id:          client.clientID,
+			Name:        client.clientName,
+			Description: client.clientDescription,
+			Version:     client.clientVersion,
+		},
+	})
+	if err != nil {
+		client.log.Errorf("failed to send client info: %s", err)
 	}
 
 	// Stop discarding updates until we exit.
