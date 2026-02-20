@@ -637,6 +637,7 @@ func (client *Client) connect(ctx context.Context) bool {
 		wg.Add(1)
 		go func(handler ConnectionHandler) {
 			handler(handlerCtx, conn)
+			handlerCancel()
 			wg.Done()
 		}(handler)
 	}
