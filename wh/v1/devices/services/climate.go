@@ -13,6 +13,7 @@ type Climate struct {
 	HeatingSetpoint  *attributes.Float // required
 	LocalTemperature *attributes.Float // required
 	PIHeatingDemand  *attributes.Int   // optional
+	HeatingDemand    *attributes.Bool  // optional
 }
 
 // New Climate service. The service ID must be unique within the device and is
@@ -26,11 +27,13 @@ func NewClimate(id string) *Climate {
 		HeatingSetpoint:  attributes.NewFloat("heating_setpoint", clientsapi.Permissions_PERM_READWRITE, attributes.Required, 5, 30, 0.5, clientsapi.Unit_UNIT_CELSIUS),
 		LocalTemperature: attributes.NewFloat("local_temperature", clientsapi.Permissions_PERM_READONLY, attributes.Required, 0, 0, 0, clientsapi.Unit_UNIT_CELSIUS),
 		PIHeatingDemand:  attributes.NewInt("pi_heating_demand", clientsapi.Permissions_PERM_READONLY, attributes.Optional, 0, 100, 1, clientsapi.Unit_UNIT_PERCENTAGE),
+		HeatingDemand:    attributes.NewBool("heating_demand", clientsapi.Permissions_PERM_READONLY, attributes.Optional),
 	}
 	srv.AddAttribute(
 		srv.HeatingSetpoint,
 		srv.LocalTemperature,
 		srv.PIHeatingDemand,
+		srv.HeatingDemand,
 	)
 	return srv
 }
