@@ -19,6 +19,7 @@ var roleMap = map[string][]Role{
 	"/woodhouse.api.v1.clients.UserService/UnpairClient":          {AdminRole},
 	"/woodhouse.api.v1.clients.UserService/BlockClient":           {AdminRole},
 	"/woodhouse.api.v1.clients.UserService/UnblockClient":         {AdminRole},
+	"/woodhouse.api.v1.clients.UserService/ForgetClient":          {AdminRole},
 	"/woodhouse.api.v1.clients.UserService/GetDevices":            {AdminRole, UserRole},
 	"/woodhouse.api.v1.clients.UserService/DevicesStream":         {AdminRole, UserRole},
 	"/woodhouse.api.v1.clients.UserService/FavoritesStream":       {AdminRole, UserRole},
