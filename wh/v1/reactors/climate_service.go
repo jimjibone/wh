@@ -17,6 +17,7 @@ type ClimateService struct {
 	heatingSetpoint  float64
 	localTemperature float64
 	piHeatingDemand  *int64
+	heatingDemand    *bool
 }
 
 // Initialises the service.
@@ -50,6 +51,15 @@ func (srv *ClimateService) handleUpdate(update *clientsapi.Service) bool {
 			if *srv.piHeatingDemand != attr.GetInt().GetValue() {
 				changed = true
 				*srv.piHeatingDemand = attr.GetInt().GetValue()
+			}
+
+		case "heating_demand":
+			if srv.heatingDemand == nil {
+				srv.heatingDemand = new(bool)
+			}
+			if *srv.heatingDemand != attr.GetBool().GetValue() {
+				changed = true
+				*srv.heatingDemand = attr.GetBool().GetValue()
 			}
 		}
 	}
@@ -120,4 +130,18 @@ func (srv *ClimateService) PiHeatingDemand() int64 {
 		return 0
 	}
 	return *srv.piHeatingDemand
+}
+
+func (srv *ClimateService) HasHeatingDemand() bool {
+	if srv == nil || srv.heatingDemand == nil {
+		return false
+	}
+	return true
+}
+
+func (srv *ClimateService) HeatingDemand() bool {
+	if srv == nil || srv.heatingDemand == nil {
+		return false
+	}
+	return *srv.heatingDemand
 }
