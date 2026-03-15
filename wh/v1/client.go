@@ -830,6 +830,17 @@ func (client *Client) deviceControl(ctx context.Context, close func(), wg *sync.
 				continue
 			}
 
+			// Send an initial QUEUED response so the requester know's it got
+			// somewhere.
+			err := stream.Send(&clientsapi.ActionResponse{
+				ActionId: req.GetActionId(),
+				Status:   clientsapi.ActionResponse_QUEUED,
+				Details:  "",
+			})
+			if err != nil {
+				client.log.Errorf("failed to send action queued response: %s", err)
+			}
+
 			// Let the device handle it in another goroutine.
 			go func() {
 				lastStatus := clientsapi.ActionResponse_UNDEFINED
