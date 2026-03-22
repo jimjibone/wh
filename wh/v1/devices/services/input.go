@@ -13,11 +13,15 @@ type Input struct {
 	On *attributes.Bool // required
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_INPUT, "input")
+}
+
 // New Input service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "input").
 func NewInput(id string) *Input {
 	if id == "" {
-		id = "input"
+		id = DefaultServiceID(clientsapi.Service_INPUT)
 	}
 	srv := &Input{
 		Generic: newGeneric(id, clientsapi.Service_INPUT),

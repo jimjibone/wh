@@ -14,11 +14,15 @@ type Battery struct {
 	Voltage *attributes.Float // optional
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_BATTERY, "battery")
+}
+
 // New Battery service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "battery").
 func NewBattery(id string) *Battery {
 	if id == "" {
-		id = "battery"
+		id = DefaultServiceID(clientsapi.Service_BATTERY)
 	}
 	srv := &Battery{
 		Generic: newGeneric(id, clientsapi.Service_BATTERY),

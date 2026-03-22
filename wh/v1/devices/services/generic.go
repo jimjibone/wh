@@ -8,6 +8,9 @@ import (
 	"github.com/jimjibone/woodhouse-4/wh/v1/devices/attributes"
 )
 
+// Static assert that Generic implements the Service interface.
+var _ Service = (*Generic)(nil)
+
 type Generic struct {
 	id       string
 	typ      clientsapi.Service_ServiceType
@@ -18,7 +21,9 @@ type Generic struct {
 	onImage  ImageHandler
 }
 
-var _ Service = (*Generic)(nil)
+func init() {
+	registerDefaultServiceID(clientsapi.Service_GENERIC, "generic")
+}
 
 // New Generic service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "generic").
@@ -28,7 +33,7 @@ func NewGeneric(id string) *Generic {
 
 func newGeneric(id string, typ clientsapi.Service_ServiceType) *Generic {
 	if id == "" {
-		id = "generic"
+		id = DefaultServiceID(typ)
 	}
 	srv := &Generic{
 		id:    id,

@@ -18,10 +18,14 @@ type Info struct {
 	WebUrl          *attributes.Text // optional
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_INFO, "info")
+}
+
 // New Info service. Only one of these should exist on a device.
 func NewInfo() *Info {
 	srv := &Info{
-		Generic:         newGeneric("info", clientsapi.Service_INFO),
+		Generic:         newGeneric(DefaultServiceID(clientsapi.Service_INFO), clientsapi.Service_INFO),
 		Name:            attributes.NewText("name", clientsapi.Permissions_PERM_READWRITE, attributes.Required),
 		Model:           attributes.NewText("model", clientsapi.Permissions_PERM_READONLY, attributes.Optional),
 		Manufacturer:    attributes.NewText("manufacturer", clientsapi.Permissions_PERM_READONLY, attributes.Optional),

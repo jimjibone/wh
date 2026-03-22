@@ -14,11 +14,15 @@ type Cover struct {
 	State    *attributes.Enum // required
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_COVER, "cover")
+}
+
 // New Cover service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "cover").
 func NewCover(id string) *Cover {
 	if id == "" {
-		id = "cover"
+		id = DefaultServiceID(clientsapi.Service_COVER)
 	}
 	srv := &Cover{
 		Generic:  newGeneric(id, clientsapi.Service_COVER),

@@ -14,11 +14,15 @@ type Button struct {
 	Duration *attributes.Duration // optional
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_BUTTON, "button")
+}
+
 // New Button service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "button").
 func NewButton(id string) *Button {
 	if id == "" {
-		id = "button"
+		id = DefaultServiceID(clientsapi.Service_BUTTON)
 	}
 	srv := &Button{
 		Generic:  newGeneric(id, clientsapi.Service_BUTTON),

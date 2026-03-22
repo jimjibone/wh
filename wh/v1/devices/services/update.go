@@ -21,11 +21,15 @@ type Update struct {
 	Remaining      *attributes.Duration // optional
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_UPDATE, "update")
+}
+
 // New Update service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "update").
 func NewUpdate(id string) *Update {
 	if id == "" {
-		id = "update"
+		id = DefaultServiceID(clientsapi.Service_UPDATE)
 	}
 	srv := &Update{
 		Generic:        newGeneric(id, clientsapi.Service_UPDATE),

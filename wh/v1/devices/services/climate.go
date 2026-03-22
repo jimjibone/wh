@@ -16,11 +16,15 @@ type Climate struct {
 	HeatingDemand    *attributes.Bool  // optional
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_CLIMATE, "climate")
+}
+
 // New Climate service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "climate").
 func NewClimate(id string) *Climate {
 	if id == "" {
-		id = "climate"
+		id = DefaultServiceID(clientsapi.Service_CLIMATE)
 	}
 	srv := &Climate{
 		Generic:          newGeneric(id, clientsapi.Service_CLIMATE),

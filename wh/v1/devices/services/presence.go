@@ -15,11 +15,15 @@ type Presence struct {
 	Distance *attributes.Float // required
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_PRESENCE, "presence")
+}
+
 // New Presence service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "presence").
 func NewPresence(id string) *Presence {
 	if id == "" {
-		id = "presence"
+		id = DefaultServiceID(clientsapi.Service_PRESENCE)
 	}
 	srv := &Presence{
 		Generic:  newGeneric(id, clientsapi.Service_PRESENCE),

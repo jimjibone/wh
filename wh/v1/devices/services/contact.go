@@ -13,11 +13,15 @@ type Contact struct {
 	Closed *attributes.Bool // required
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_CONTACT, "contact")
+}
+
 // New Contact service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "contact").
 func NewContact(id string) *Contact {
 	if id == "" {
-		id = "contact"
+		id = DefaultServiceID(clientsapi.Service_CONTACT)
 	}
 	srv := &Contact{
 		Generic: newGeneric(id, clientsapi.Service_CONTACT),

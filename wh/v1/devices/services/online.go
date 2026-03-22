@@ -14,10 +14,14 @@ type Online struct {
 	LastSeen *attributes.Time // required
 }
 
+func init() {
+	registerDefaultServiceID(clientsapi.Service_ONLINE, "online")
+}
+
 // New Online service. Only one of these should exist on a device.
 func NewOnline() *Online {
 	srv := &Online{
-		Generic:  newGeneric("online", clientsapi.Service_ONLINE),
+		Generic:  newGeneric(DefaultServiceID(clientsapi.Service_ONLINE), clientsapi.Service_ONLINE),
 		Online:   attributes.NewBool("online", clientsapi.Permissions_PERM_READONLY, attributes.Required),
 		LastSeen: attributes.NewTime("last_seen", clientsapi.Permissions_PERM_READONLY, attributes.Required),
 	}
