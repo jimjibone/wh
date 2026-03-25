@@ -62,6 +62,12 @@ type Device struct {
 	Online *services.Online
 }
 
+// Create a new Device with the specified ID and device type. The ID should be a
+// universally unique device ID (typically a hardware address or other static
+// and unique identifier and prefixed with the protocol, e.g.
+// "zigbee00158d00045c089f"). After creation, the object should be cleaned up
+// via the Close method. After that use AddService to add services to this
+// device.
 func NewDevice(id string, typ clientsapi.Device_DeviceType) *Device {
 	ctx, close := context.WithCancel(context.Background())
 	dev := &Device{

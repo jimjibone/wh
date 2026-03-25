@@ -273,7 +273,7 @@ func (rc *Client) runloop(ctx context.Context, conn *grpc.ClientConn) {
 			}
 			return
 		}
-		if update.Id == "" {
+		if update.Device == nil {
 			// Detect when the full state has finished being streamed (the first
 			// empty message is our cue). Tell clients that the full state has
 			// been fetched from the server.
@@ -283,13 +283,13 @@ func (rc *Client) runloop(ctx context.Context, conn *grpc.ClientConn) {
 
 			// Find the reactors for this device update and let them handle it.
 			rc.mu.RLock()
-			if reactable, found := rc.reactables[update.GetId()]; found {
+			if reactable, found := rc.reactables[update.Device.GetId()]; found {
 				for device := range reactable.devices {
 					if device != nil {
-						device.HandleUpdate(update)
+						device.HandleUpdate(update.Device)
 					}
 				}
-				for _, update := range update.Services {
+				for _, update := range update.Device.Services {
 					for service, info := range reactable.services {
 						if service != nil {
 							if update.GetTyp() == info.typ && update.GetId() == info.id {
