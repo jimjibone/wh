@@ -100,11 +100,17 @@ type ClientOption func(*Client)
 
 type ConnectionHandler func(ctx context.Context, conn *grpc.ClientConn)
 
-// Sets the client info manually. Overrides the default option of generating an
+// Sets the client ID manually. Overrides the default option of generating an
 // ID automatically.
-func WithClientInfo(id, name, description, version string) ClientOption {
+func WithClientID(id string) ClientOption {
 	return func(c *Client) {
 		c.clientID = id
+	}
+}
+
+// Sets the client info manually.
+func WithClientInfo(name, description, version string) ClientOption {
+	return func(c *Client) {
 		c.clientName = name
 		c.clientDescription = description
 		c.clientVersion = version
