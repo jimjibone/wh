@@ -16,8 +16,9 @@ type ClimateService struct {
 
 	heatingSetpoint  float64
 	localTemperature float64
-	piHeatingDemand  *int64
 	heatingDemand    *bool
+	piHeatingDemand  *int64
+	valvePosition    *int64
 }
 
 // Initialises the service.
@@ -44,6 +45,15 @@ func (srv *ClimateService) handleUpdate(update *clientsapi.Service) bool {
 				srv.localTemperature = attr.GetFloat().GetValue()
 			}
 
+		case "heating_demand":
+			if srv.heatingDemand == nil {
+				srv.heatingDemand = new(bool)
+			}
+			if *srv.heatingDemand != attr.GetBool().GetValue() {
+				changed = true
+				*srv.heatingDemand = attr.GetBool().GetValue()
+			}
+
 		case "pi_heating_demand":
 			if srv.piHeatingDemand == nil {
 				srv.piHeatingDemand = new(int64)
@@ -53,13 +63,13 @@ func (srv *ClimateService) handleUpdate(update *clientsapi.Service) bool {
 				*srv.piHeatingDemand = attr.GetInt().GetValue()
 			}
 
-		case "heating_demand":
-			if srv.heatingDemand == nil {
-				srv.heatingDemand = new(bool)
+		case "valve_position":
+			if srv.valvePosition == nil {
+				srv.valvePosition = new(int64)
 			}
-			if *srv.heatingDemand != attr.GetBool().GetValue() {
+			if *srv.valvePosition != attr.GetInt().GetValue() {
 				changed = true
-				*srv.heatingDemand = attr.GetBool().GetValue()
+				*srv.valvePosition = attr.GetInt().GetValue()
 			}
 		}
 	}
@@ -118,6 +128,20 @@ func (srv *ClimateService) LocalTemperature() float64 {
 	return srv.localTemperature
 }
 
+func (srv *ClimateService) HasHeatingDemand() bool {
+	if srv == nil || srv.heatingDemand == nil {
+		return false
+	}
+	return true
+}
+
+func (srv *ClimateService) HeatingDemand() bool {
+	if srv == nil || srv.heatingDemand == nil {
+		return false
+	}
+	return *srv.heatingDemand
+}
+
 func (srv *ClimateService) HasPiHeatingDemand() bool {
 	if srv == nil || srv.piHeatingDemand == nil {
 		return false
@@ -132,16 +156,38 @@ func (srv *ClimateService) PiHeatingDemand() int64 {
 	return *srv.piHeatingDemand
 }
 
-func (srv *ClimateService) HasHeatingDemand() bool {
-	if srv == nil || srv.heatingDemand == nil {
+func (srv *ClimateService) HasValvePosition() bool {
+	if srv == nil || srv.valvePosition == nil {
 		return false
 	}
 	return true
 }
 
-func (srv *ClimateService) HeatingDemand() bool {
-	if srv == nil || srv.heatingDemand == nil {
-		return false
+func (srv *ClimateService) ValvePosition() int64 {
+	if srv == nil || srv.valvePosition == nil {
+		return 0
 	}
-	return *srv.heatingDemand
+	return *srv.valvePosition
+}
+
+func (srv *ClimateService) SetValvePosition(ctx context.Context, val int64) error {
+	if srv == nil {
+		return fmt.Errorf("service not initialised")
+	}
+	return srv.requester(
+		ctx,
+		&clientsapi.ActionRequest{
+			ServiceId: srv.id,
+			Values: []*clientsapi.Value{
+				{
+					Id: "valve_position",
+					Int: &clientsapi.IntValue{
+						Value: val,
+					},
+				},
+			},
+		},
+		func(resp *clientsapi.ActionResponse) {
+		},
+	)
 }

@@ -140,7 +140,7 @@ func (rc *Client) GetCamera(deviceID string, serviceID ...string) *CameraService
 	return service
 }
 
-// Get a cliamte service reactor for the specified device ID. If serviceID is not defined the default of "cliamte" will be used.
+// Get a cliamte service reactor for the specified device ID. If serviceID is not defined the default of "climate" will be used.
 func (rc *Client) GetClimate(deviceID string, serviceID ...string) *ClimateService {
 	service := &ClimateService{}
 	rc.addService(deviceID, serviceID, "climate", clientsapi.Service_CLIMATE, service)
