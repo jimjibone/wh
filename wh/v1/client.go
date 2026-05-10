@@ -932,6 +932,7 @@ func (client *Client) imagesControl(ctx context.Context, close func(), wg *sync.
 				if err != nil {
 					client.log.Errorf("failed to send image response: %s", err)
 				}
+				continue
 			}
 
 			// Let the device handle it in another goroutine.
