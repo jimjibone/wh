@@ -114,6 +114,7 @@ func (s scheduleSun) OnDay(t time.Time) (t2 time.Time) {
 	case Sunset:
 		t2 = set
 	}
+	t2 = t2.In(t.Location())
 	t2 = t2.Add(s.Offset)
 	return t2
 }

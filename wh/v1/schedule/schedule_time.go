@@ -86,7 +86,8 @@ func MustScheduleTimeStr(t string, days ...time.Weekday) scheduleTime {
 }
 
 func (s scheduleTime) seconds(t time.Time) int {
-	return s.Hour*3600 + s.Minute*60 + s.Second
+	t2 := s.OnDay(t)
+	return t2.Hour()*3600 + t2.Minute()*60 + t2.Second()
 }
 
 func (s scheduleTime) String() string {
