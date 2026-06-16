@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
-	"github.com/jimjibone/woodhouse-4/apitools"
-	"github.com/jimjibone/woodhouse-4/log"
+	"github.com/jimjibone/log"
+	"github.com/jimjibone/wh/v1/apitools"
+	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

@@ -1,8 +1,8 @@
 package services
 
 import (
-	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
-	"github.com/jimjibone/woodhouse-4/wh/v1/devices/attributes"
+	"github.com/jimjibone/wh/v1/devices/attributes"
+	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 )
 
 // Static assert that Cover implements the Service interface.

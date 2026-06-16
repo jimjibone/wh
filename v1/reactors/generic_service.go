@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
+	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 )
 
 type GenericService struct {

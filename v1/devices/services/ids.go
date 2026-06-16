@@ -1,6 +1,6 @@
 package services
 
-import clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
+import clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 
 var serviceTypeToID map[clientsapi.Service_ServiceType]string
 

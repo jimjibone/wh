@@ -3,8 +3,8 @@ package wh
 import (
 	"fmt"
 
-	"github.com/jimjibone/woodhouse-4/log"
-	"github.com/jimjibone/woodhouse-4/shared/stores"
+	"github.com/jimjibone/log"
+	"github.com/jimjibone/wh/v1/shared/stores"
 )
 
 type clientStore struct {

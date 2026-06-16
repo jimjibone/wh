@@ -1,8 +1,8 @@
 package reactors
 
 import (
-	clientsapi "github.com/jimjibone/woodhouse-4/api/go/v1/clients"
-	"github.com/jimjibone/woodhouse-4/log"
+	"github.com/jimjibone/log"
+	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 )
 
 type CameraService struct {

@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/jimjibone/woodhouse-4/log"
-	"github.com/jimjibone/woodhouse-4/shared/atomicfile"
-	"github.com/jimjibone/woodhouse-4/shared/paths"
+	"github.com/jimjibone/log"
+	"github.com/jimjibone/wh/v1/shared/atomicfile"
+	"github.com/jimjibone/wh/v1/shared/paths"
 )
 
 // Store holds key value pairs.

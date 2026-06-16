@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jimjibone/woodhouse-4/wh/v1/schedule"
+	"github.com/jimjibone/wh/v1/schedule"
 	"github.com/nathan-osman/go-sunrise"
 )
 
