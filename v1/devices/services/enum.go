@@ -13,10 +13,6 @@ type Enum struct {
 	Value *attributes.Enum // required
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_ENUM, "enum")
-}
-
 // New Enum service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "enum").
 func NewEnum(id string) *Enum {

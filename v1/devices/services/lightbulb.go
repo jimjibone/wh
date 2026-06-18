@@ -19,10 +19,6 @@ type Lightbulb struct {
 	Transition *attributes.Duration // optional
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_LIGHTBULB, "lightbulb")
-}
-
 // New Lightbulb service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "lightbulb").
 func NewLightbulb(id string) *Lightbulb {

@@ -18,10 +18,6 @@ type Info struct {
 	WebUrl          *attributes.Text // optional
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_INFO, "info")
-}
-
 // New Info service. Only one of these should exist on a device.
 func NewInfo() *Info {
 	srv := &Info{

@@ -21,10 +21,6 @@ type Update struct {
 	Remaining      *attributes.Duration // optional
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_UPDATE, "update")
-}
-
 // New Update service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "update").
 func NewUpdate(id string) *Update {

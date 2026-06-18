@@ -14,10 +14,6 @@ type Online struct {
 	LastSeen *attributes.Time // required
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_ONLINE, "online")
-}
-
 // New Online service. Only one of these should exist on a device.
 func NewOnline() *Online {
 	srv := &Online{

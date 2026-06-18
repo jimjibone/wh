@@ -15,10 +15,6 @@ type Environment struct {
 	Pressure    *attributes.Float // optional
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_ENVIRONMENT, "environment")
-}
-
 // New Environment service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "environment").
 func NewEnvironment(id string) *Environment {

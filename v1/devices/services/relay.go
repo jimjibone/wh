@@ -17,10 +17,6 @@ type Relay struct {
 	Temperature *attributes.Float // optional
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_RELAY, "relay")
-}
-
 // New Relay service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "relay").
 func NewRelay(id string) *Relay {

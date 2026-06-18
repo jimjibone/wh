@@ -13,10 +13,6 @@ type Motion struct {
 	Motion *attributes.Bool // required
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_MOTION, "motion")
-}
-
 // New Motion service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "motion").
 func NewMotion(id string) *Motion {

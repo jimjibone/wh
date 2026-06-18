@@ -17,10 +17,6 @@ type Climate struct {
 	ValvePosition    *attributes.Int   // optional
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_CLIMATE, "climate")
-}
-
 // New Climate service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "climate").
 func NewClimate(id string) *Climate {

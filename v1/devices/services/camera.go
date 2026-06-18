@@ -13,10 +13,6 @@ type Camera struct {
 	Image *attributes.Image
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_CAMERA, "camera")
-}
-
 // New Camera service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "camera").
 func NewCamera(id string) *Camera {

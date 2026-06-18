@@ -21,10 +21,6 @@ type Generic struct {
 	onImage  ImageHandler
 }
 
-func init() {
-	registerDefaultServiceID(clientsapi.Service_GENERIC, "generic")
-}
-
 // New Generic service. The service ID must be unique within the device and is
 // normally the service name in lowercase (e.g. "generic").
 func NewGeneric(id string) *Generic {
