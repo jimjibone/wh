@@ -26,6 +26,11 @@ func main() {
 				Usage:    "woodhouse server address (disables automatic discovery)",
 				Required: true,
 			},
+			&cli.StringFlag{
+				Name:  "id",
+				Usage: "ID used by this bridge",
+				Value: "example-bridge",
+			},
 			&cli.BoolFlag{
 				Name:  "sim-sensors",
 				Usage: "simulate sensors",
