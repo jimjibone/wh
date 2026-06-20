@@ -14,6 +14,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// UpdateCallback is called for each non-nil device update received from the
+// server, before the update is dispatched to any reactables. It is invoked
+// outside of the client's lock so the implementer is free to register new
+// reactables (e.g. via GetDevice or the GetXxx service methods) in response to
+// the update.
+type UpdateCallback func(update *clientsapi.Device)
+
 type Client struct {
 	log    *log.Context
 	client *wh.Client
@@ -21,6 +28,7 @@ type Client struct {
 
 	mu         sync.RWMutex
 	reactables map[string]*reactable
+	onUpdate   UpdateCallback
 }
 
 // Collection of things which react to updates from a particular device ID.
@@ -70,6 +78,17 @@ func (rc *Client) Ready() <-chan struct{} {
 
 func (rc *Client) Client() *wh.Client {
 	return rc.client
+}
+
+// OnUpdate registers a callback which is invoked for each non-nil device update
+// received from the server, before the update is dispatched to any reactables.
+// The callback is called outside of the client's lock, so the implementer may
+// register new reactables in response to the update. Only one callback may be
+// registered; calling OnUpdate again replaces the previous callback.
+func (rc *Client) OnUpdate(callback UpdateCallback) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.onUpdate = callback
 }
 
 func (rc *Client) GetDevice(deviceID string) *Device {
@@ -280,6 +299,16 @@ func (rc *Client) runloop(ctx context.Context, conn *grpc.ClientConn) {
 			rc.ready.Done()
 		} else {
 			// rc.log.Infof("received reactor update: %s", update)
+
+			// Call the registered update callback (if any) before dispatching
+			// to reactables. This is done outside of the lock so the callback
+			// implementer is free to register new reactables in response.
+			rc.mu.RLock()
+			onUpdate := rc.onUpdate
+			rc.mu.RUnlock()
+			if onUpdate != nil {
+				onUpdate(update.Device)
+			}
 
 			// Find the reactors for this device update and let them handle it.
 			rc.mu.RLock()
