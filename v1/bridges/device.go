@@ -1,4 +1,4 @@
-package devices
+package bridges
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jimjibone/log"
-	"github.com/jimjibone/wh/v1/devices/services"
+	"github.com/jimjibone/wh/v1/bridges/services"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 )
 

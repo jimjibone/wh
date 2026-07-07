@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jimjibone/log"
-	"github.com/jimjibone/wh/v1/devices/attributes"
+	"github.com/jimjibone/wh/v1/bridges/attributes"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 )
 

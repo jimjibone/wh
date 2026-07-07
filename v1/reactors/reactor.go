@@ -2,11 +2,13 @@ package reactors
 
 import (
 	"context"
+	"errors"
+	"io"
 	"sync"
 
 	"github.com/jimjibone/log"
-	"github.com/jimjibone/wh/v1"
-	"github.com/jimjibone/wh/v1/shared/stores"
+	"github.com/jimjibone/wh/v1/bridges"
+	"github.com/jimjibone/wh/v1/clients"
 	"github.com/jimjibone/wh/v1/waiter"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 	"google.golang.org/grpc"
@@ -21,14 +23,17 @@ import (
 // the update.
 type UpdateCallback func(update *clientsapi.Device)
 
-type Client struct {
+type Reactor struct {
 	log    *log.Context
-	client *wh.Client
+	bridge *bridges.Bridge
 	ready  *waiter.Waiter // ready when we're connected to the server and have received the first batch of device states
 
 	mu         sync.RWMutex
 	reactables map[string]*reactable
 	onUpdate   UpdateCallback
+
+	serviceMu sync.RWMutex
+	service   clientsapi.ClientServiceClient
 }
 
 // Collection of things which react to updates from a particular device ID.
@@ -60,24 +65,24 @@ func (r *reactable) addService(service Service, typ clientsapi.Service_ServiceTy
 	}
 }
 
-func NewClient(store stores.Store, serverAddr string, opts ...wh.ClientOption) *Client {
-	rc := &Client{
+func NewReactor(config bridges.BridgeConfig, opts ...clients.ClientOption) *Reactor {
+	rc := &Reactor{
 		log:        log.NewContext(log.DefaultLogger, "reactor", log.DebugLevel),
 		ready:      waiter.NewWaiter(),
 		reactables: make(map[string]*reactable),
 	}
-	opts = append(opts, wh.WithConnectionHandler(rc.runloop))
-	rc.client = wh.NewClient(store, serverAddr, opts...)
+	opts = append(opts, clients.WithConnectionHandler(rc.runloop))
+	rc.bridge = bridges.NewBridge(config, opts...)
 	return rc
 }
 
 // Returns a channel which is closed when the client connects to the server.
-func (rc *Client) Ready() <-chan struct{} {
+func (rc *Reactor) Ready() <-chan struct{} {
 	return rc.ready.Wait()
 }
 
-func (rc *Client) Client() *wh.Client {
-	return rc.client
+func (rc *Reactor) Client() *clients.Client {
+	return rc.bridge.Client()
 }
 
 // OnUpdate registers a callback which is invoked for each non-nil device update
@@ -85,13 +90,13 @@ func (rc *Client) Client() *wh.Client {
 // The callback is called outside of the client's lock, so the implementer may
 // register new reactables in response to the update. Only one callback may be
 // registered; calling OnUpdate again replaces the previous callback.
-func (rc *Client) OnUpdate(callback UpdateCallback) {
+func (rc *Reactor) OnUpdate(callback UpdateCallback) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	rc.onUpdate = callback
 }
 
-func (rc *Client) GetDevice(deviceID string) *Device {
+func (rc *Reactor) GetDevice(deviceID string) *Device {
 	if deviceID == "" {
 		panic("device id must be defined")
 	}
@@ -104,13 +109,13 @@ func (rc *Client) GetDevice(deviceID string) *Device {
 	}
 	device := newDevice(deviceID, func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
 		req.DeviceId = deviceID
-		return rc.client.RequestAction(ctx, req, handler)
+		return rc.requestAction(ctx, req, handler)
 	})
 	reactable.addDevice(device)
 	return device
 }
 
-func (rc *Client) addService(deviceID string, serviceIDs []string, defaultID string, typ clientsapi.Service_ServiceType, service Service) {
+func (rc *Reactor) addService(deviceID string, serviceIDs []string, defaultID string, typ clientsapi.Service_ServiceType, service Service) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	if deviceID == "" {
@@ -133,130 +138,160 @@ func (rc *Client) addService(deviceID string, serviceIDs []string, defaultID str
 	}
 	service.init(serviceID, func(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
 		req.DeviceId = deviceID
-		return rc.client.RequestAction(ctx, req, handler)
+		return rc.requestAction(ctx, req, handler)
 	})
 	reactable.addService(service, typ, serviceID)
 }
 
 // Get a battery service reactor for the specified device ID. If serviceID is not defined the default of "battery" will be used.
-func (rc *Client) GetBattery(deviceID string, serviceID ...string) *BatteryService {
+func (rc *Reactor) GetBattery(deviceID string, serviceID ...string) *BatteryService {
 	service := &BatteryService{}
 	rc.addService(deviceID, serviceID, "battery", clientsapi.Service_BATTERY, service)
 	return service
 }
 
 // Get a button service reactor for the specified device ID. If serviceID is not defined the default of "button" will be used.
-func (rc *Client) GetButton(deviceID string, serviceID ...string) *ButtonService {
+func (rc *Reactor) GetButton(deviceID string, serviceID ...string) *ButtonService {
 	service := &ButtonService{}
 	rc.addService(deviceID, serviceID, "button", clientsapi.Service_BUTTON, service)
 	return service
 }
 
 // Get a camera service reactor for the specified device ID. If serviceID is not defined the default of "camera" will be used.
-func (rc *Client) GetCamera(deviceID string, serviceID ...string) *CameraService {
+func (rc *Reactor) GetCamera(deviceID string, serviceID ...string) *CameraService {
 	service := &CameraService{}
 	rc.addService(deviceID, serviceID, "camera", clientsapi.Service_CAMERA, service)
 	return service
 }
 
 // Get a cliamte service reactor for the specified device ID. If serviceID is not defined the default of "climate" will be used.
-func (rc *Client) GetClimate(deviceID string, serviceID ...string) *ClimateService {
+func (rc *Reactor) GetClimate(deviceID string, serviceID ...string) *ClimateService {
 	service := &ClimateService{}
 	rc.addService(deviceID, serviceID, "climate", clientsapi.Service_CLIMATE, service)
 	return service
 }
 
 // Get a contact service reactor for the specified device ID. If serviceID is not defined the default of "contact" will be used.
-func (rc *Client) GetContact(deviceID string, serviceID ...string) *ContactService {
+func (rc *Reactor) GetContact(deviceID string, serviceID ...string) *ContactService {
 	service := &ContactService{}
 	rc.addService(deviceID, serviceID, "contact", clientsapi.Service_CONTACT, service)
 	return service
 }
 
 // Get a enum service reactor for the specified device ID. If serviceID is not defined the default of "enum" will be used.
-func (rc *Client) GetEnum(deviceID string, serviceID ...string) *EnumService {
+func (rc *Reactor) GetEnum(deviceID string, serviceID ...string) *EnumService {
 	service := &EnumService{}
 	rc.addService(deviceID, serviceID, "enum", clientsapi.Service_ENUM, service)
 	return service
 }
 
 // Get a environment service reactor for the specified device ID. If serviceID is not defined the default of "environment" will be used.
-func (rc *Client) GetEnvironment(deviceID string, serviceID ...string) *EnvironmentService {
+func (rc *Reactor) GetEnvironment(deviceID string, serviceID ...string) *EnvironmentService {
 	service := &EnvironmentService{}
 	rc.addService(deviceID, serviceID, "environment", clientsapi.Service_ENVIRONMENT, service)
 	return service
 }
 
 // Get a generic service reactor for the specified device ID. If serviceID is not defined the default of "generic" will be used.
-func (rc *Client) GetGeneric(deviceID string, serviceID ...string) *GenericService {
+func (rc *Reactor) GetGeneric(deviceID string, serviceID ...string) *GenericService {
 	service := &GenericService{}
 	rc.addService(deviceID, serviceID, "generic", clientsapi.Service_GENERIC, service)
 	return service
 }
 
 // Get a info service reactor for the specified device ID. If serviceID is not defined the default of "info" will be used.
-func (rc *Client) GetInfo(deviceID string, serviceID ...string) *InfoService {
+func (rc *Reactor) GetInfo(deviceID string, serviceID ...string) *InfoService {
 	service := &InfoService{}
 	rc.addService(deviceID, serviceID, "info", clientsapi.Service_INFO, service)
 	return service
 }
 
 // Get a input service reactor for the specified device ID. If serviceID is not defined the default of "input" will be used.
-func (rc *Client) GetInput(deviceID string, serviceID ...string) *InputService {
+func (rc *Reactor) GetInput(deviceID string, serviceID ...string) *InputService {
 	service := &InputService{}
 	rc.addService(deviceID, serviceID, "input", clientsapi.Service_INPUT, service)
 	return service
 }
 
 // Get a lightbulb service reactor for the specified device ID. If serviceID is not defined the default of "lightbulb" will be used.
-func (rc *Client) GetLightbulb(deviceID string, serviceID ...string) *LightbulbService {
+func (rc *Reactor) GetLightbulb(deviceID string, serviceID ...string) *LightbulbService {
 	service := &LightbulbService{}
 	rc.addService(deviceID, serviceID, "lightbulb", clientsapi.Service_LIGHTBULB, service)
 	return service
 }
 
 // Get a motion service reactor for the specified device ID. If serviceID is not defined the default of "motion" will be used.
-func (rc *Client) GetMotion(deviceID string, serviceID ...string) *MotionService {
+func (rc *Reactor) GetMotion(deviceID string, serviceID ...string) *MotionService {
 	service := &MotionService{}
 	rc.addService(deviceID, serviceID, "motion", clientsapi.Service_MOTION, service)
 	return service
 }
 
 // Get a online service reactor for the specified device ID. If serviceID is not defined the default of "online" will be used.
-func (rc *Client) GetOnline(deviceID string, serviceID ...string) *OnlineService {
+func (rc *Reactor) GetOnline(deviceID string, serviceID ...string) *OnlineService {
 	service := &OnlineService{}
 	rc.addService(deviceID, serviceID, "online", clientsapi.Service_ONLINE, service)
 	return service
 }
 
 // Get a presence service reactor for the specified device ID. If serviceID is not defined the default of "presence" will be used.
-func (rc *Client) GetPresence(deviceID string, serviceID ...string) *PresenceService {
+func (rc *Reactor) GetPresence(deviceID string, serviceID ...string) *PresenceService {
 	service := &PresenceService{}
 	rc.addService(deviceID, serviceID, "presence", clientsapi.Service_PRESENCE, service)
 	return service
 }
 
 // Get a relay service reactor for the specified device ID. If serviceID is not defined the default of "relay" will be used.
-func (rc *Client) GetRelay(deviceID string, serviceID ...string) *RelayService {
+func (rc *Reactor) GetRelay(deviceID string, serviceID ...string) *RelayService {
 	service := &RelayService{}
 	rc.addService(deviceID, serviceID, "relay", clientsapi.Service_RELAY, service)
 	return service
 }
 
 // Get a update service reactor for the specified device ID. If serviceID is not defined the default of "update" will be used.
-func (rc *Client) GetUpdate(deviceID string, serviceID ...string) *UpdateService {
+func (rc *Reactor) GetUpdate(deviceID string, serviceID ...string) *UpdateService {
 	service := &UpdateService{}
 	rc.addService(deviceID, serviceID, "update", clientsapi.Service_UPDATE, service)
 	return service
 }
 
-func (rc *Client) Run() error {
-	return rc.client.Run()
+func (rc *Reactor) Run() error {
+	return rc.bridge.Run()
 }
 
-func (rc *Client) runloop(ctx context.Context, conn *grpc.ClientConn) {
+func (rc *Reactor) requestAction(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
+	if handler == nil {
+		panic("handler is nil")
+	}
+	rc.serviceMu.RLock()
+	defer rc.serviceMu.RUnlock()
+	if rc.service == nil {
+		return clients.ErrNotConnected
+	}
+	stream, err := rc.service.SendAction(ctx, req)
+	if err != nil {
+		return err
+	}
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		handler(resp)
+	}
+}
+
+func (rc *Reactor) runloop(ctx context.Context, conn *grpc.ClientConn) {
 	rc.log.Infof("stream started")
 	defer rc.log.Infof("stream finished")
+
+	// Create a new shared service for action requests.
+	rc.serviceMu.Lock()
+	rc.service = clientsapi.NewClientServiceClient(conn)
+	rc.serviceMu.Unlock()
 
 	service := clientsapi.NewClientServiceClient(conn)
 	stream, err := service.DeviceStream(ctx)

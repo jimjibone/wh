@@ -4,13 +4,13 @@ import (
 	"time"
 
 	"github.com/jimjibone/log"
-	"github.com/jimjibone/wh/v1/devices"
-	"github.com/jimjibone/wh/v1/devices/services"
+	"github.com/jimjibone/wh/v1/bridges"
+	"github.com/jimjibone/wh/v1/bridges/services"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v1/clients"
 )
 
 type FakeRelay struct {
-	dev    *devices.Device
+	dev    *bridges.Device
 	info   *services.Info
 	online *services.Online
 	relay  *services.Relay
@@ -18,7 +18,7 @@ type FakeRelay struct {
 
 func NewFakeRelay(id, name string) *FakeRelay {
 	dev := &FakeRelay{
-		dev:    devices.NewDevice(id, clientsapi.Device_DEVICE),
+		dev:    bridges.NewDevice(id, clientsapi.Device_DEVICE),
 		info:   services.NewInfo(),
 		online: services.NewOnline(),
 		relay:  services.NewRelay("relay"),

@@ -1,0 +1,22 @@
+version: 3
+
+tasks:
+  build-examples:
+    desc: Build the example bridge and reactor
+    cmds:
+      - go build -o build/example-bridge ./examples/v1-bridge
+      - go build -o build/example-reactor ./examples/v1-reactor
+
+  run-example-bridge:
+    desc: Build and run the example bridge
+    deps:
+      - build-examples
+    cmds:
+      - cd ./build && ./example-bridge {{.CLI_ARGS}}
+
+  run-example-reactor:
+    desc: Build and run the example reactor
+    deps:
+      - build-examples
+    cmds:
+      - cd ./build && ./example-reactor {{.CLI_ARGS}}

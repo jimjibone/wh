@@ -5,7 +5,8 @@ import (
 	"os"
 
 	"github.com/jimjibone/log"
-	"github.com/jimjibone/wh/v1"
+	"github.com/jimjibone/wh/v1/bridges"
+	"github.com/jimjibone/wh/v1/clients"
 	"github.com/jimjibone/wh/v1/shared/stores"
 	"github.com/urfave/cli/v2"
 )
@@ -55,13 +56,17 @@ func main() {
 			store := stores.NewFSStore(args.String("store"))
 
 			// Create the client.
-			client := wh.NewClient(
-				store,
-				args.String("addr"),
-				wh.WithClientID(args.String("id")),
-				wh.WithClientInfo("Test Client", "Client for testing Woodhouse functionality", "0.1.0"),
-				wh.WithImages(),
-			)
+			client := bridges.NewBridge(bridges.BridgeConfig{
+				ClientConfig: clients.ClientConfig{
+					Store:             store,
+					ServerAddr:        args.String("addr"),
+					ClientID:          args.String("id"),
+					ClientName:        "Example Bridge",
+					ClientDescription: "Client for testing Woodhouse functionality",
+					ClientVersion:     "0.1.0",
+				},
+				ImagesEnabled: true,
+			})
 
 			fake1 := NewFakeLightbulbColor("fake1", "Living Room Light")
 			if err := client.AddDevice(fake1.dev); err != nil {
@@ -100,6 +105,11 @@ func main() {
 
 			fake2a := NewFakeRelay("fake2a", "Washing Machine")
 			if err := client.AddDevice(fake2a.dev); err != nil {
+				log.Fatalf("failed to add device: %s", err)
+			}
+
+			fake2b := NewFakeMotion("fake2b", "Hallway Motion", args.Bool("sim-sensors"))
+			if err := client.AddDevice(fake2b.dev); err != nil {
 				log.Fatalf("failed to add device: %s", err)
 			}
 

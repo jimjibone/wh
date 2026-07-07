@@ -1,4 +1,4 @@
-package wh
+package clients
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io"
+	"net"
 	"os"
 	"os/signal"
 	"slices"
@@ -15,9 +15,6 @@ import (
 	"time"
 
 	"github.com/jimjibone/log"
-	"github.com/jimjibone/queue/v2"
-	"github.com/jimjibone/wh/v1/apitools"
-	"github.com/jimjibone/wh/v1/devices"
 	"github.com/jimjibone/wh/v1/shared/crypt"
 	"github.com/jimjibone/wh/v1/shared/random"
 	"github.com/jimjibone/wh/v1/shared/stores"
@@ -52,42 +49,62 @@ type Client struct {
 
 	handlers []ConnectionHandler
 
-	devicesMu sync.RWMutex               // locks the devices map only
-	devices   map[string]*devices.Device // key=id
-	updates   *queue.Queue[*clientsapi.Device]
-
-	imagesEnabled bool
-
 	serviceMu sync.RWMutex
 	service   clientsapi.ClientServiceClient
+}
+
+type ClientConfig struct {
+	// Store in which to keep persistent data.
+	Store stores.Store
+
+	// Server address to connect to.
+	ServerAddr string
+
+	// Optional ID for this client. If not set a random name is generate on
+	// first run and saved in the store.
+	ClientID string
+
+	// Optional name for this client.
+	ClientName string
+
+	// Optional description for this client.
+	ClientDescription string
+
+	// Optional version string for this client.
+	ClientVersion string
 }
 
 // Create a new woodhouse client. The store is used to keep pairing secrets
 // between executions of the client. The serverAddr is the address of the
 // woodhouse server.
-func NewClient(store stores.Store, serverAddr string, opts ...ClientOption) *Client {
+func NewClient(config ClientConfig, opts ...ClientOption) *Client {
+	// Just panic if the configuration isn't valid.
+	if config.Store == nil {
+		log.Fatalf("store not defined in client config")
+	}
+	if config.ServerAddr == "" {
+		log.Fatalf("server address not defined in client config")
+	}
+	if _, _, err := net.SplitHostPort(config.ServerAddr); err != nil {
+		log.Fatalf("server address not valid in client config: %s", err)
+	}
+
 	client := &Client{
 		log:        log.NewContext(log.DefaultLogger, "client", log.DebugLevel),
-		store:      newClientStore(store),
-		serverAddr: serverAddr,
+		store:      newClientStore(config.Store),
+		serverAddr: config.ServerAddr,
 
-		clientID:          "",
-		clientName:        "",
-		clientDescription: "",
-		clientVersion:     "",
+		clientID:          config.ClientID,
+		clientName:        config.ClientName,
+		clientDescription: config.ClientDescription,
+		clientVersion:     config.ClientVersion,
 
 		minBackoff:  time.Second,
 		maxBackoff:  32 * time.Second,
 		lastBackoff: 0,
-
-		devices: make(map[string]*devices.Device),
-		updates: queue.New[*clientsapi.Device](),
 	}
 
 	client.stopCtx, client.stop = context.WithCancel(context.Background())
-
-	// Discard updates until we're connected to the server.
-	client.updates.Discard(true)
 
 	for _, o := range opts {
 		o(client)
@@ -100,23 +117,6 @@ type ClientOption func(*Client)
 
 type ConnectionHandler func(ctx context.Context, conn *grpc.ClientConn)
 
-// Sets the client ID manually. Overrides the default option of generating an
-// ID automatically.
-func WithClientID(id string) ClientOption {
-	return func(c *Client) {
-		c.clientID = id
-	}
-}
-
-// Sets the client info manually.
-func WithClientInfo(name, description, version string) ClientOption {
-	return func(c *Client) {
-		c.clientName = name
-		c.clientDescription = description
-		c.clientVersion = version
-	}
-}
-
 // Set log level. Overrides the default of warnings and above.
 func WithLogLevel(level log.Level) ClientOption {
 	return func(c *Client) {
@@ -128,78 +128,6 @@ func WithLogLevel(level log.Level) ClientOption {
 func WithConnectionHandler(handler ConnectionHandler) ClientOption {
 	return func(c *Client) {
 		c.handlers = append(c.handlers, handler)
-	}
-}
-
-// Enable the images functionality.
-func WithImages() ClientOption {
-	return func(c *Client) {
-		c.imagesEnabled = true
-	}
-}
-
-// Add a device to the client.
-func (client *Client) AddDevice(device *devices.Device) error {
-	client.devicesMu.Lock()
-	defer client.devicesMu.Unlock()
-	if _, found := client.devices[device.ID()]; found {
-		return fmt.Errorf("device id already exists in client")
-	}
-	client.devices[device.ID()] = device
-	device.Init(func(state *clientsapi.Device) {
-		client.updates.Push(state)
-	})
-	device.SendFullState()
-	return nil
-}
-
-func (client *Client) RequestAction(ctx context.Context, req *clientsapi.ActionRequest, handler func(resp *clientsapi.ActionResponse)) error {
-	if handler == nil {
-		panic("handler is nil")
-	}
-	client.serviceMu.RLock()
-	defer client.serviceMu.RUnlock()
-	if client.service == nil {
-		return ErrNotConnected
-	}
-	stream, err := client.service.SendAction(ctx, req)
-	if err != nil {
-		return err
-	}
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
-			return err
-		}
-		handler(resp)
-	}
-}
-
-func (client *Client) RequestImage(ctx context.Context, req *clientsapi.ImageRequest, handler func(resp *clientsapi.ImageResponse)) error {
-	if handler == nil {
-		panic("handler is nil")
-	}
-	client.serviceMu.RLock()
-	defer client.serviceMu.RUnlock()
-	if client.service == nil {
-		return ErrNotConnected
-	}
-	stream, err := client.service.SendImageRequest(ctx, req)
-	if err != nil {
-		return err
-	}
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
-			return err
-		}
-		handler(resp)
 	}
 }
 
@@ -407,6 +335,7 @@ func (client *Client) pair(ctx context.Context) bool {
 	// 1. Send our ID to the server.
 	err = rpc.Send(&clientsapi.PairRequest{
 		ClientId: client.clientID,
+		// TODO: send client name, description and version when pairing
 	})
 	if err != nil {
 		client.log.Errorf("pairing failed to send client id: %s", err)
@@ -660,17 +589,6 @@ func (client *Client) connect(ctx context.Context) bool {
 		}(handler)
 	}
 
-	// Start the device control/feedback loop.
-	wg.Add(2)
-	go client.deviceFeedback(handlerCtx, handlerCancel, wg, conn)
-	go client.deviceControl(handlerCtx, handlerCancel, wg, conn)
-
-	// Start the images comms if enabled.
-	if client.imagesEnabled {
-		wg.Add(1)
-		go client.imagesControl(handlerCtx, handlerCancel, wg, conn)
-	}
-
 	// Monitor the connection and return if it closes.
 	client.log.Debugf("connection complete")
 	ticker := time.NewTicker(5 * time.Second)
@@ -724,255 +642,5 @@ func (client *Client) backoff(ctx context.Context, reset bool) {
 	select {
 	case <-ctx.Done():
 	case <-timer.C:
-	}
-}
-
-func (client *Client) deviceFeedback(ctx context.Context, close func(), wg *sync.WaitGroup, conn *grpc.ClientConn) {
-	defer close()
-	defer wg.Done()
-
-	client.log.Infof("device feedback started")
-	defer client.log.Infof("device feedback finished")
-
-	service := clientsapi.NewClientServiceClient(conn)
-	stream, err := service.StatusStream(ctx)
-	if err != nil {
-		client.log.Errorf("failed to start status stream: %s", err)
-		return
-	}
-
-	// Send the client info to the server.
-	err = stream.Send(&clientsapi.StatusUpdate{
-		ClientInfo: &clientsapi.ClientInfo{
-			Id:          client.clientID,
-			Name:        client.clientName,
-			Description: client.clientDescription,
-			Version:     client.clientVersion,
-		},
-	})
-	if err != nil {
-		client.log.Errorf("failed to send client info: %s", err)
-	}
-
-	// Stop discarding updates until we exit.
-	client.updates.Discard(false)
-	defer client.updates.Discard(true)
-
-	// Get all devices to send their full states.
-	client.devicesMu.RLock()
-	for _, dev := range client.devices {
-		dev.SendFullState()
-	}
-	client.devicesMu.RUnlock()
-
-	// Wait for errors.
-	go func() {
-		err := stream.RecvMsg(nil)
-		client.log.Errorf("failed to send device update: %s", err)
-		close()
-	}()
-
-	// Now wait for updates.
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case update := <-client.updates.Pop():
-			// Send the update to the server.
-			err := stream.Send(&clientsapi.StatusUpdate{
-				DeviceInfo: []*clientsapi.Device{
-					update,
-				},
-			})
-			if err != nil {
-				client.log.Errorf("failed to send device %q update: %s", update.Id, err)
-			}
-		}
-	}
-}
-
-func (client *Client) deviceControl(ctx context.Context, close func(), wg *sync.WaitGroup, conn *grpc.ClientConn) {
-	defer close()
-	defer wg.Done()
-
-	client.log.Infof("device control started")
-	defer client.log.Infof("device control finished")
-
-	service := clientsapi.NewClientServiceClient(conn)
-	stream, err := service.ActionStream(ctx)
-	if err != nil {
-		client.log.Errorf("failed to start action stream: %s", err)
-		return
-	}
-
-	for {
-		req, err := stream.Recv()
-		if err != nil {
-			code := status.Code(err)
-			if code == codes.Unavailable || code == codes.Canceled {
-				client.log.Debugf("action stream closed: %s", err)
-			} else {
-				client.log.Errorf("failed to recv action request: %s", err)
-			}
-			return
-		} else {
-			client.log.Debugf("received action: %s", req)
-
-			// Find the device.
-			client.devicesMu.RLock()
-			dev, found := client.devices[req.GetDeviceId()]
-			client.devicesMu.RUnlock()
-			if !found {
-				client.log.Errorf("device not found for action: %s", req)
-				err := stream.Send(&clientsapi.ActionResponse{
-					ActionId: req.GetActionId(),
-					Status:   clientsapi.ActionResponse_ERROR,
-					Details:  "device not found",
-				})
-				if err != nil {
-					client.log.Errorf("failed to send action response: %s", err)
-				}
-				continue
-			}
-
-			// Send an initial QUEUED response so the requester know's it got
-			// somewhere.
-			err := stream.Send(&clientsapi.ActionResponse{
-				ActionId: req.GetActionId(),
-				Status:   clientsapi.ActionResponse_QUEUED,
-				Details:  "",
-			})
-			if err != nil {
-				client.log.Errorf("failed to send action queued response: %s", err)
-			}
-
-			// Let the device handle it in another goroutine.
-			go func() {
-				lastStatus := clientsapi.ActionResponse_UNDEFINED
-				err := dev.HandleAction(req, func(res *clientsapi.ActionResponse) {
-					str := res.String()
-					if len(str) > 1000 {
-						str = str[:1000]
-					}
-					client.log.Debugf("sending action response: %s", str)
-					lastStatus = res.Status
-					err := stream.Send(res)
-					if err != nil {
-						client.log.Errorf("failed to send action response: %s", err)
-					}
-				})
-				if err != nil {
-					client.log.Debugf("sending action error response: %s", err)
-					err := stream.Send(&clientsapi.ActionResponse{
-						ActionId: req.GetActionId(),
-						Status:   clientsapi.ActionResponse_ERROR,
-						Details:  err.Error(),
-					})
-					if err != nil {
-						client.log.Errorf("failed to send action error response: %s", err)
-					}
-				} else {
-					// Auto return complete if no other final status was sent.
-					if lastStatus < clientsapi.ActionResponse_COMPLETE {
-						res := &clientsapi.ActionResponse{
-							ActionId: req.GetActionId(),
-							Status:   clientsapi.ActionResponse_COMPLETE,
-							Details:  "",
-						}
-						client.log.Debugf("sending action auto response: %s", res)
-						err := stream.Send(res)
-						if err != nil {
-							client.log.Errorf("failed to send action auto response: %s", err)
-						}
-					}
-				}
-			}()
-		}
-	}
-}
-
-func (client *Client) imagesControl(ctx context.Context, close func(), wg *sync.WaitGroup, conn *grpc.ClientConn) {
-	defer close()
-	defer wg.Done()
-
-	client.log.Infof("image control started")
-	defer client.log.Infof("image control finished")
-
-	service := clientsapi.NewClientServiceClient(conn)
-	stream, err := service.ImageStream(ctx)
-	if err != nil {
-		client.log.Errorf("failed to start image stream: %s", err)
-		return
-	}
-
-	for {
-		req, err := stream.Recv()
-		if err != nil {
-			code := status.Code(err)
-			if code == codes.Unavailable || code == codes.Canceled {
-				client.log.Debugf("image stream closed: %s", err)
-			} else {
-				client.log.Errorf("failed to recv image request: %s", err)
-			}
-			return
-		} else {
-			client.log.Debugf("received image request: %s", req)
-
-			// Find the device.
-			client.devicesMu.RLock()
-			dev, found := client.devices[req.GetDeviceId()]
-			client.devicesMu.RUnlock()
-			if !found {
-				err := stream.Send(&clientsapi.ImageResponse{
-					RequestId: req.GetRequestId(),
-					Status:    clientsapi.ImageResponse_ERROR,
-					Details:   "device not found",
-				})
-				if err != nil {
-					client.log.Errorf("failed to send image response: %s", err)
-				}
-				continue
-			}
-
-			// Let the device handle it in another goroutine.
-			go func() {
-				lastStatus := clientsapi.ImageResponse_UNDEFINED
-				data, err := dev.HandleImage(req, func(res *clientsapi.ImageResponse) {
-					client.log.Debugf("sending image response: %s", apitools.ImageResponseString(res))
-					lastStatus = res.Status
-					err := stream.Send(res)
-					if err != nil {
-						client.log.Errorf("failed to send image response: %s", err)
-					}
-				})
-				if err != nil {
-					client.log.Debugf("sending image error response: %s", err)
-					err := stream.Send(&clientsapi.ImageResponse{
-						RequestId: req.GetRequestId(),
-						Status:    clientsapi.ImageResponse_ERROR,
-						Details:   err.Error(),
-					})
-					if err != nil {
-						client.log.Errorf("failed to send image error response: %s", err)
-					}
-				} else {
-					// Auto return complete if no other final status was sent.
-					if lastStatus < clientsapi.ImageResponse_COMPLETE {
-						res := &clientsapi.ImageResponse{
-							RequestId: req.GetRequestId(),
-							Status:    clientsapi.ImageResponse_COMPLETE,
-							Details:   "",
-							Data:      data,
-						}
-						client.log.Debugf("sending image auto response: %s", apitools.ImageResponseString(res))
-						err := stream.Send(res)
-						if err != nil {
-							client.log.Errorf("failed to send image auto response: %s", err)
-						}
-					}
-				}
-			}()
-		}
 	}
 }
