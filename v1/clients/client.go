@@ -341,8 +341,11 @@ func (client *Client) pair(ctx context.Context) bool {
 
 	// 1. Send our ID and ephemeral public key to the server.
 	err = rpc.Send(&clientsapi.PairRequest{
-		ClientId:     client.clientID,
-		ClientPubkey: pka,
+		ClientId:          client.clientID,
+		ClientName:        client.clientName,
+		ClientDescription: client.clientDescription,
+		ClientVersion:     client.clientVersion,
+		ClientPubkey:      pka,
 		// TODO: send client name, description and version when pairing
 	})
 	if err != nil {

@@ -18,6 +18,10 @@ github.com/jimjibone/log v0.0.0-20260606072821-03b097ef99de h1:lacdWnURSFNru9mw4
 github.com/jimjibone/log v0.0.0-20260606072821-03b097ef99de/go.mod h1:cAZ4Fho7ewjG2YJswKbNnB5/kgT4b6xvYB+DosJhUeM=
 github.com/jimjibone/queue v0.0.0-20251004200840-d3855e27766b h1:lrRl76MlYrsW4n+J3HOKxXcEp8IWS4qDwlwydzZxL3Q=
 github.com/jimjibone/queue v0.0.0-20251004200840-d3855e27766b/go.mod h1:x9lSdmhC96e5FY2HvbEnFl+4IKhNje2gAIP//7wYcZM=
+github.com/jimjibone/woodhouse-api v0.0.0-20260616214800-b2cf0c4eb042 h1:GphOe0/T11cuXxZYJPe036/el3300HwD5AOHWLwzOYQ=
+github.com/jimjibone/woodhouse-api v0.0.0-20260616214800-b2cf0c4eb042/go.mod h1:xljlHbIweagYsPrBpiCWLrKhVDA8sMXbOTpWlC3CxFk=
+github.com/jimjibone/woodhouse-api v0.0.0-20260711162143-11e44122cfd4 h1:aMKlGKOEhMDpEIfmNYgsa+cszOTnViQu06yIyaoHYY0=
+github.com/jimjibone/woodhouse-api v0.0.0-20260711162143-11e44122cfd4/go.mod h1:VIQNXdBRqxxhCf0tQcxUVo1nEETAWMS8GCkXjS6qcH4=
 github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHPsaIE=
 github.com/mattn/go-colorable v0.1.14/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
