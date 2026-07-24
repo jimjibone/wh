@@ -36,10 +36,33 @@ func NewFSStore(path string) Store {
 	// vars and `~`).
 	path = paths.AbsPathify(path)
 
-	// Create the filesystem directory.
-	err := os.MkdirAll(path, 0750)
+	// Create the filesystem directory. The store holds the bridge's refresh
+	// token and pinned cert, so modes are deliberately tight (0700/0600) and
+	// healed on startup in case a pre-existing directory or file was left
+	// looser than that.
+	err := os.MkdirAll(path, 0700)
 	if err != nil {
 		log.Fatalf("failed to create fs store: %s", err)
+	}
+
+	// MkdirAll doesn't tighten the mode of a directory that already existed,
+	// so do it explicitly.
+	if err := os.Chmod(path, 0700); err != nil {
+		log.Fatalf("failed to tighten fs store directory mode: %s", err)
+	}
+
+	// Heal the mode of any pre-existing files in the store.
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		log.Fatalf("failed to read fs store directory: %s", err)
+	}
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() {
+			continue
+		}
+		if err := os.Chmod(filepath.Join(path, entry.Name()), 0600); err != nil {
+			log.Fatalf("failed to tighten fs store file mode: %s", err)
+		}
 	}
 
 	return &fsStore{path}
@@ -47,7 +70,7 @@ func NewFSStore(path string) Store {
 
 func (store *fsStore) Set(key string, value []byte) error {
 	// Use atomic file writes to prevent partially written files on error.
-	return atomicfile.WriteFile(filepath.Join(store.path, key), 0640, bytes.NewReader(value))
+	return atomicfile.WriteFile(filepath.Join(store.path, key), 0600, bytes.NewReader(value))
 }
 
 func (store *fsStore) Has(key string) bool {

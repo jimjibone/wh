@@ -39,7 +39,10 @@ func (store *clientStore) Upgrade(log *log.Context) error {
 	if err := renamer("id", "wh.id"); err != nil {
 		return err
 	}
-	if err := renamer("cert", "wh.crt"); err != nil {
+	if err := renamer("cert", "wh.cert"); err != nil {
+		return err
+	}
+	if err := renamer("wh.crt", "wh.cert"); err != nil {
 		return err
 	}
 	if err := renamer("token", "wh.token"); err != nil {

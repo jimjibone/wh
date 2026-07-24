@@ -11,8 +11,8 @@ import (
 // an error occurs, the target file is guaranteed to be either fully written, or
 // not written at all. WriteFile overwrites any file that exists at the
 // location (but only if the write fully succeeds, otherwise the existing file
-// is unmodified). Permissions are copied from an existing file or the
-// defaultMode.
+// is unmodified). The resulting file always ends up with defaultMode,
+// regardless of any pre-existing file's mode at that location.
 func WriteFile(filename string, defaultMode os.FileMode, r io.Reader) (err error) {
 	// write to a temp file first, then we'll atomically replace the target file
 	// with the temp file.
@@ -52,25 +52,6 @@ func WriteFile(filename string, defaultMode os.FileMode, r io.Reader) (err error
 		return fmt.Errorf("can't close tempfile %q: %v", name, err)
 	}
 
-	// get the file mode from the original file and use that for the replacement
-	// file, too.
-	destInfo, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		// no original file
-	} else if err != nil {
-		return err
-	} else {
-		sourceInfo, err := os.Stat(name)
-		if err != nil {
-			return err
-		}
-
-		if sourceInfo.Mode() != destInfo.Mode() {
-			if err := os.Chmod(name, destInfo.Mode()); err != nil {
-				return fmt.Errorf("can't set filemode on tempfile %q: %v", name, err)
-			}
-		}
-	}
 	if err := os.Rename(name, filename); err != nil {
 		return fmt.Errorf("cannot replace %q with tempfile %q: %v", filename, name, err)
 	}
