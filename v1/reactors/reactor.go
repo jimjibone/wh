@@ -81,6 +81,10 @@ func (rc *Reactor) Ready() <-chan struct{} {
 	return rc.ready.Wait()
 }
 
+func (rc *Reactor) Bridge() *bridges.Bridge {
+	return rc.bridge
+}
+
 func (rc *Reactor) Client() *clients.Client {
 	return rc.bridge.Client()
 }
