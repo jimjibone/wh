@@ -28,6 +28,12 @@ func (attr *Text) SetOptional(optional OptionalType) {
 	attr.optional = optional
 }
 
+// SetPerms changes the attribute's permissions. Should be called before adding
+// the attribute to the bridge.
+func (attr *Text) SetPerms(perms clientsapi.Permissions) {
+	attr.perms = perms
+}
+
 func (attr *Text) Get() string {
 	return attr.value
 }

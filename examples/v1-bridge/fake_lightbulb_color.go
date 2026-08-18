@@ -32,6 +32,16 @@ func NewFakeLightbulbColor(id, name string) *FakeLightbulbColor {
 	dev.online.Online.Set(true)
 	dev.online.LastSeen.Set(time.Now())
 
+	// Support renaming. A real bridge would forward the new name to its
+	// backend, return any error, and let the backend's state update drive
+	// Name.Set; here the backend is simulated with a short delay.
+	dev.info.EnableRename(func(newName string) error {
+		time.Sleep(500 * time.Millisecond)
+		log.Infof("lightbulb %q renamed to %q", id, newName)
+		dev.info.Name.Set(newName)
+		return nil
+	})
+
 	// Set up the light service.
 	dev.lightbulb.On.OnAction(func(val bool) {
 

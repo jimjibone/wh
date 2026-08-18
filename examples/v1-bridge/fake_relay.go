@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jimjibone/log"
@@ -31,6 +32,20 @@ func NewFakeRelay(id, name string) *FakeRelay {
 	dev.info.Manufacturer.Set("Fake Things Inc")
 	dev.online.Online.Set(true)
 	dev.online.LastSeen.Set(time.Now())
+
+	// Support renaming. A real bridge would forward the new name to its
+	// backend, return any error, and let the backend's state update drive
+	// Name.Set; here the backend is simulated with a short delay. Renaming to
+	// "fail" demonstrates an error reaching the user.
+	dev.info.EnableRename(func(newName string) error {
+		time.Sleep(time.Second)
+		if newName == "fail" {
+			return fmt.Errorf("backend rejected the name %q", newName)
+		}
+		log.Infof("relay %q renamed to %q", id, newName)
+		dev.info.Name.Set(newName)
+		return nil
+	})
 
 	// Set up the light service.
 	dev.relay.OnAction(dev.handleAction)
