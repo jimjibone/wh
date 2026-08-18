@@ -57,8 +57,13 @@ func NewFakeLightbulbColor(id, name string) *FakeLightbulbColor {
 		dev.lightbulb.ColorTemp.Set(val)
 	})
 	dev.lightbulb.Color.OnAction(func(huesat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY) {
-		log.Infof("color set to hue %f, sat %f, x %f, y %f", huesat.Hue, huesat.Sat, xy.X, xy.Y)
-		dev.lightbulb.Color.Set(huesat.Hue, huesat.Sat, xy.X, xy.Y)
+		if huesat != nil {
+			log.Infof("color set to hue %0.0f°, sat %0.0f%%", huesat.Hue, huesat.Sat)
+			dev.lightbulb.Color.SetHueSat(huesat.Hue, huesat.Sat)
+		} else if xy != nil {
+			log.Infof("color set to x %0.3f, y %0.3f", xy.X, xy.Y)
+			dev.lightbulb.Color.SetXY(xy.X, xy.Y)
+		}
 	})
 
 	// Set default values.
