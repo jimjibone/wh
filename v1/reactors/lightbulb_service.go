@@ -3,6 +3,7 @@ package reactors
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ type LightbulbService struct {
 	saturation *int64
 	hue        *float64
 	colorTemp  *int64
+	colorMode  *string
 	transition *time.Duration
 }
 
@@ -86,22 +88,33 @@ func (srv *LightbulbService) handleUpdate(update *clientsapi.Service) bool {
 				*srv.brightness = attr.GetInt().GetValue()
 			}
 
-		case "saturation":
-			if srv.saturation == nil {
-				srv.saturation = new(int64)
-			}
-			if *srv.saturation != attr.GetInt().GetValue() {
-				changed = true
-				*srv.saturation = attr.GetInt().GetValue()
+		case "color":
+			// Bridges publish hue and saturation as a single color attribute.
+			if hs := attr.GetColor().GetHueSat(); hs != nil {
+				if srv.hue == nil {
+					srv.hue = new(float64)
+				}
+				if *srv.hue != hs.GetHue() {
+					changed = true
+					*srv.hue = hs.GetHue()
+				}
+				sat := int64(math.Round(hs.GetSat()))
+				if srv.saturation == nil {
+					srv.saturation = new(int64)
+				}
+				if *srv.saturation != sat {
+					changed = true
+					*srv.saturation = sat
+				}
 			}
 
-		case "hue":
-			if srv.hue == nil {
-				srv.hue = new(float64)
+		case "color_mode":
+			if srv.colorMode == nil {
+				srv.colorMode = new(string)
 			}
-			if *srv.hue != attr.GetFloat().GetValue() {
+			if *srv.colorMode != attr.GetEnum().GetValue() {
 				changed = true
-				*srv.hue = attr.GetFloat().GetValue()
+				*srv.colorMode = attr.GetEnum().GetValue()
 			}
 
 		case "color_temp":
@@ -155,19 +168,26 @@ func (srv *LightbulbService) Request(ctx context.Context, req LightbulbRequest, 
 			},
 		})
 	}
-	if req.Saturation != nil {
+	if req.Hue != nil || req.Saturation != nil {
+		// Hue and saturation are sent as a single color value. Fill the
+		// missing half from the current state.
+		var hue, sat float64
+		if srv.hue != nil {
+			hue = *srv.hue
+		}
+		if srv.saturation != nil {
+			sat = float64(*srv.saturation)
+		}
+		if req.Hue != nil {
+			hue = *req.Hue
+		}
+		if req.Saturation != nil {
+			sat = float64(*req.Saturation)
+		}
 		values = append(values, &clientsapi.Value{
-			Id: "saturation",
-			Int: &clientsapi.IntValue{
-				Value: *req.Saturation,
-			},
-		})
-	}
-	if req.Hue != nil {
-		values = append(values, &clientsapi.Value{
-			Id: "hue",
-			Float: &clientsapi.FloatValue{
-				Value: *req.Hue,
+			Id: "color",
+			Color: &clientsapi.ColorValue{
+				HueSat: &clientsapi.ColorHueSat{Hue: hue, Sat: sat},
 			},
 		})
 	}
@@ -271,6 +291,22 @@ func (srv *LightbulbService) ColorTemp() int64 {
 		return 0.0
 	}
 	return *srv.colorTemp
+}
+
+func (srv *LightbulbService) HasColorMode() bool {
+	if srv == nil || srv.colorMode == nil {
+		return false
+	}
+	return true
+}
+
+// Returns which of color_temp or color the bulb last applied: "color_temp" or
+// "color" (see services.LightbulbColorMode*). Empty if unknown.
+func (srv *LightbulbService) ColorMode() string {
+	if srv == nil || srv.colorMode == nil {
+		return ""
+	}
+	return *srv.colorMode
 }
 
 func (srv *LightbulbService) HasTransition() bool {

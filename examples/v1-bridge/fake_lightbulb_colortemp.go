@@ -45,6 +45,7 @@ func NewFakeLightbulbColorTemp(id, name string) *FakeLightbulbColorTemp {
 	dev.lightbulb.ColorTemp.OnAction(func(val int64) {
 		log.Infof("color temperature set to %d", val)
 		dev.lightbulb.ColorTemp.Set(val)
+		dev.lightbulb.ColorMode.Set(services.LightbulbColorModeColorTemp)
 	})
 
 	// Set default values.
@@ -52,6 +53,8 @@ func NewFakeLightbulbColorTemp(id, name string) *FakeLightbulbColorTemp {
 	dev.lightbulb.Brightness.Set(75)
 	dev.lightbulb.ColorTemp.Set(454)
 	dev.lightbulb.ColorTemp.SetLimits(153, 555, 1)
+	dev.lightbulb.ColorMode.SetOptions([]string{services.LightbulbColorModeColorTemp})
+	dev.lightbulb.ColorMode.Set(services.LightbulbColorModeColorTemp)
 	dev.lightbulb.Transition.Set(0)
 
 	return dev
