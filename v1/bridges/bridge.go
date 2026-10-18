@@ -3,6 +3,8 @@ package bridges
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/jimjibone/log"
@@ -20,9 +22,10 @@ type Bridge struct {
 	client *clients.Client
 	config BridgeConfig
 
-	devicesMu sync.RWMutex       // locks the devices map only
-	devices   map[string]*Device // key=id
-	updates   *queue.Queue[*clientsapi.Device]
+	devicesMu sync.RWMutex        // locks the devices and removed maps only
+	devices   map[string]*Device  // key=id
+	removed   map[string]struct{} // key=id, resent on each connect until re-added
+	updates   *queue.Queue[*clientsapi.StatusUpdate]
 }
 
 type BridgeConfig struct {
@@ -39,7 +42,8 @@ func NewBridge(config BridgeConfig, opts ...clients.ClientOption) *Bridge {
 		config: config,
 
 		devices: make(map[string]*Device),
-		updates: queue.New[*clientsapi.Device](),
+		removed: make(map[string]struct{}),
+		updates: queue.New[*clientsapi.StatusUpdate](),
 	}
 
 	opts = append(opts,
@@ -69,10 +73,36 @@ func (bridge *Bridge) AddDevice(device *Device) error {
 		return fmt.Errorf("device id already exists in bridge")
 	}
 	bridge.devices[device.ID()] = device
+	delete(bridge.removed, device.ID())
 	device.Init(func(state *clientsapi.Device) {
-		bridge.updates.Push(state)
+		bridge.updates.Push(&clientsapi.StatusUpdate{
+			DeviceInfo: []*clientsapi.Device{state},
+		})
 	})
 	device.SendFullState()
+	return nil
+}
+
+// Remove a device from the bridge and tell the server to remove it, even if
+// online. The device is closed and must not be reused; to add it again create
+// a new Device. If the bridge is not connected the removal is sent on the next
+// connect.
+func (bridge *Bridge) RemoveDevice(id string) error {
+	bridge.devicesMu.Lock()
+	defer bridge.devicesMu.Unlock()
+	device, found := bridge.devices[id]
+	if !found {
+		return fmt.Errorf("device id not found in bridge")
+	}
+	delete(bridge.devices, id)
+	bridge.removed[id] = struct{}{}
+
+	// Close before queueing the removal so no update from the device can
+	// follow it.
+	device.Close()
+	bridge.updates.Push(&clientsapi.StatusUpdate{
+		RemovedDeviceIds: []string{id},
+	})
 	return nil
 }
 
@@ -117,12 +147,7 @@ func (bridge *Bridge) deviceFeedback(inctx context.Context, conn *grpc.ClientCon
 	bridge.updates.Discard(false)
 	defer bridge.updates.Discard(true)
 
-	// Get all devices to send their full states.
-	bridge.devicesMu.RLock()
-	for _, dev := range bridge.devices {
-		dev.SendFullState()
-	}
-	bridge.devicesMu.RUnlock()
+	bridge.queueFullState()
 
 	// Wait for errors.
 	go func() {
@@ -139,15 +164,26 @@ func (bridge *Bridge) deviceFeedback(inctx context.Context, conn *grpc.ClientCon
 
 		case update := <-bridge.updates.Pop():
 			// Send the update to the server.
-			err := stream.Send(&clientsapi.StatusUpdate{
-				DeviceInfo: []*clientsapi.Device{
-					update,
-				},
-			})
+			err := stream.Send(update)
 			if err != nil {
-				bridge.log.Errorf("failed to send device %q update: %s", update.Id, err)
+				bridge.log.Errorf("failed to send status update: %s", err)
 			}
 		}
+	}
+}
+
+// Queues the removed device IDs and the full state of every device. Called on
+// each connect so removals made while disconnected still reach the server.
+func (bridge *Bridge) queueFullState() {
+	bridge.devicesMu.RLock()
+	defer bridge.devicesMu.RUnlock()
+	if len(bridge.removed) > 0 {
+		bridge.updates.Push(&clientsapi.StatusUpdate{
+			RemovedDeviceIds: slices.Sorted(maps.Keys(bridge.removed)),
+		})
+	}
+	for _, dev := range bridge.devices {
+		dev.SendFullState()
 	}
 }
 

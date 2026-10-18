@@ -36,6 +36,10 @@ func main() {
 				Name:  "sim-sensors",
 				Usage: "simulate sensors",
 			},
+			&cli.DurationFlag{
+				Name:  "sim-pairing",
+				Usage: "pair and unpair a fake relay at this interval (0 disables)",
+			},
 			&cli.BoolFlag{
 				Name:    "debug",
 				Aliases: []string{"v"},
@@ -121,6 +125,10 @@ func main() {
 			fake4 := NewFakeCamera("fake4", "Front Door Camera")
 			if err := client.AddDevice(fake4.dev); err != nil {
 				log.Fatalf("failed to add device: %s", err)
+			}
+
+			if interval := args.Duration("sim-pairing"); interval > 0 {
+				go SimPairing(client, "fake5", "Spare Plug", interval)
 			}
 
 			err := client.Run()

@@ -52,6 +52,7 @@ type Device struct {
 	serviceUpdates chan *clientsapi.Service
 	wg             sync.WaitGroup
 	close          func()
+	done           <-chan struct{} // closed by Close
 
 	// The device's info service. Note that the default info service will be
 	// overwritten if a new info service is provided via AddService.
@@ -78,6 +79,7 @@ func NewDevice(id string, typ clientsapi.Device_DeviceType) *Device {
 		deviceUpdates:  make(chan *clientsapi.Device, 1),
 		serviceUpdates: make(chan *clientsapi.Service, 1),
 		close:          close,
+		done:           ctx.Done(),
 		Info:           services.NewInfo(),
 		Online:         services.NewOnline(),
 	}
@@ -94,6 +96,7 @@ func NewDevice(id string, typ clientsapi.Device_DeviceType) *Device {
 	return dev
 }
 
+// Close stops the device. Updates made after Close are dropped.
 func (dev *Device) Close() {
 	dev.close()
 	dev.wg.Wait()
@@ -138,11 +141,17 @@ func (dev *Device) SendFullState() {
 	for _, srv := range dev.services {
 		pb.Services = append(pb.Services, srv.Pb())
 	}
-	dev.deviceUpdates <- pb
+	select {
+	case dev.deviceUpdates <- pb:
+	case <-dev.done:
+	}
 }
 
 func (dev *Device) pusher(srv *clientsapi.Service) {
-	dev.serviceUpdates <- srv
+	select {
+	case dev.serviceUpdates <- srv:
+	case <-dev.done:
+	}
 }
 
 // HandleAction is called in its own goroutine when an ActionRequest is
