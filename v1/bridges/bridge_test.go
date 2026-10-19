@@ -34,6 +34,9 @@ func collect(b *Bridge, quiet time.Duration) []*clientsapi.StatusUpdate {
 	}
 }
 
+// fullStateIDs returns the sorted, de-duplicated IDs sent as full states. A
+// full state queued by AddDevice is pushed asynchronously, so it may arrive
+// alongside the one sent on connect.
 func fullStateIDs(updates []*clientsapi.StatusUpdate) []string {
 	var ids []string
 	for _, update := range updates {
@@ -44,7 +47,7 @@ func fullStateIDs(updates []*clientsapi.StatusUpdate) []string {
 		}
 	}
 	slices.Sort(ids)
-	return ids
+	return slices.Compact(ids)
 }
 
 func removedIDs(updates []*clientsapi.StatusUpdate) []string {

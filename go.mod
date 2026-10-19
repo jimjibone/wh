@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/jimjibone/log v0.0.0-20260606072821-03b097ef99de
 	github.com/jimjibone/queue v0.0.0-20251004200840-d3855e27766b
-	github.com/jimjibone/woodhouse-api v0.0.0-20260711162143-11e44122cfd4
+	github.com/jimjibone/woodhouse-api v0.0.0-20261018235630-e95b66c30834
 	github.com/nathan-osman/go-sunrise v1.1.0
 	github.com/schollz/mnemonicode v1.0.1
 	github.com/urfave/cli/v2 v2.27.7
