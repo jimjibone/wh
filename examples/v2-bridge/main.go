@@ -6,6 +6,7 @@ import (
 
 	"github.com/jimjibone/log"
 	"github.com/jimjibone/wh/v2/bridges"
+	"github.com/jimjibone/wh/v2/bridges/services"
 	"github.com/jimjibone/wh/v2/clients"
 	"github.com/jimjibone/wh/v2/shared/stores"
 	"github.com/urfave/cli/v2"
@@ -34,11 +35,11 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:  "sim-sensors",
-				Usage: "simulate sensors",
+				Usage: "simulate sensors, inputs, buttons and other changes",
 			},
 			&cli.DurationFlag{
 				Name:  "sim-pairing",
-				Usage: "pair and unpair a fake relay at this interval (0 disables)",
+				Usage: "pair and unpair a fake plug at this interval (0 disables)",
 			},
 			&cli.BoolFlag{
 				Name:    "debug",
@@ -72,63 +73,38 @@ func main() {
 				ImagesEnabled: true,
 			})
 
-			fake1 := NewFakeLightbulbColor("fake1", "Living Room Light")
-			if err := client.AddDevice(fake1.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
+			sim := args.Bool("sim-sensors")
+			devices := []*bridges.Device{
+				// Lights: features gate attributes and the set command's params.
+				NewFakeLight("lamp1", "Living Room Light", services.LightFeatureBrightness, services.LightFeatureColorTemp, services.LightFeatureHS).dev,
+				NewFakeLight("lamp2", "Hallway Light", services.LightFeatureBrightness, services.LightFeatureColorTemp).dev,
+				NewFakeLight("lamp3", "Porch Light").dev,
+				// Outputs and inputs: endpoints group each output with its meter and input.
+				NewFakePlug("plug1", "Boiler", 3).dev,
+				NewFakePlug("plug2", "Washing Machine", 2000).dev,
+				NewFakeSwitch2("switch1", "Landing Switch", sim).dev,
+				NewFakeRemote("remote1", "Bedside Remote", sim).dev,
+				// Sensors, with device sample times and events.
+				NewFakeClimateSensor("sensor1", "Bedroom Sensor", sim).dev,
+				NewFakePresence("presence1", "Kitchen Presence", sim).dev,
+				NewFakeTankLevel("tank1", "Rain Tank", sim).dev,
+				NewFakeCamera("camera1", "Front Door Camera", sim).dev,
+				// Commands with params, lists of structs and run-time enum options.
+				NewFakeThermostat("trv1", "Bedroom Radiator", sim).dev,
+				NewFakeCover("blind1", "Study Blind").dev,
+				NewFakeSpeaker("speaker1", "Kitchen Speaker").dev,
+				NewFakeTV("tv1", "Lounge TV").dev,
+				// Pairing: start returns a result; submit_code adds a device.
+				NewFakeHub(client, "hub1", "Example Hub").dev,
 			}
-
-			fake1a := NewFakeLightbulbColorTemp("fake1a", "Hallway Light")
-			if err := client.AddDevice(fake1a.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake1b := NewFakeLightbulbColorTemp("fake1b", "Kitchen Light")
-			if err := client.AddDevice(fake1b.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake1c := NewFakeLightbulbColor("fake1c", "Bedroom Light")
-			if err := client.AddDevice(fake1c.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake1d := NewFakeLightbulbColorTemp("fake1d", "Bedroom Lamp")
-			if err := client.AddDevice(fake1d.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake1e := NewFakeLightbulbColorTemp("fake1e", "Hallway Lamp")
-			if err := client.AddDevice(fake1e.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake2 := NewFakeRelay("fake2", "Boiler")
-			if err := client.AddDevice(fake2.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake2a := NewFakeRelay("fake2a", "Washing Machine")
-			if err := client.AddDevice(fake2a.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake2b := NewFakeMotion("fake2b", "Hallway Motion", args.Bool("sim-sensors"))
-			if err := client.AddDevice(fake2b.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake3 := NewFakePresence("fake3", "Kitchen Presence", args.Bool("sim-sensors"))
-			if err := client.AddDevice(fake3.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
-			}
-
-			fake4 := NewFakeCamera("fake4", "Front Door Camera")
-			if err := client.AddDevice(fake4.dev); err != nil {
-				log.Fatalf("failed to add device: %s", err)
+			for _, dev := range devices {
+				if err := client.AddDevice(dev); err != nil {
+					log.Fatalf("failed to add device %q: %s", dev.ID(), err)
+				}
 			}
 
 			if interval := args.Duration("sim-pairing"); interval > 0 {
-				go SimPairing(client, "fake5", "Spare Plug", interval)
+				go SimPairing(client, "plug9", "Spare Plug", interval)
 			}
 
 			err := client.Run()
