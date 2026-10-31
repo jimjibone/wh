@@ -1,107 +1,60 @@
 package attributes
 
 import (
-	"fmt"
 	"math"
+	"time"
 
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
+	"github.com/jimjibone/woodhouse-api/values"
+	"google.golang.org/protobuf/proto"
 )
 
-type Float struct {
-	id       string
-	perms    clientsapi.Permissions
-	optional OptionalType
-	min      float64
-	max      float64
-	step     float64
-	unit     clientsapi.Unit
-	value    float64
-	isSet    bool
-	push     func(*clientsapi.Attribute)
-	onAction func(val float64)
-}
-
-func NewFloat(id string, perms clientsapi.Permissions, optional OptionalType, min, max, step float64, unit clientsapi.Unit) *Float {
-	return &Float{
-		id:       id,
-		perms:    perms,
-		optional: optional,
-		min:      min,
-		max:      max,
-		step:     step,
-		unit:     unit,
-	}
-}
-
-func (attr *Float) SetOptional(optional OptionalType) {
-	attr.optional = optional
-}
-
-func (attr *Float) Get() float64 {
-	return attr.value
-}
-
-func (attr *Float) GetLimits() (min, max, step float64) {
-	return attr.min, attr.max, attr.step
-}
-
-func (attr *Float) Set(value float64) bool {
-	attr.isSet = true
-	if math.Abs(attr.value-value) > 0.0001 {
-		attr.value = value
-		if attr.push != nil {
-			attr.push(attr.Pb())
-		} else {
-			panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-		}
-		return true
-	}
-	return false
-}
-
-func (attr *Float) SetLimits(min, max, step float64) {
-	attr.min = min
-	attr.max = max
-	attr.step = step
-	if attr.push != nil {
-		attr.push(attr.Pb())
-	} else {
-		panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-	}
-}
-
-// HandleAction calls the attribute's OnAction handler if set.
-func (attr *Float) HandleAction(val *clientsapi.FloatValue) {
-	if attr.onAction != nil {
-		attr.onAction(val.GetValue())
-	}
-}
-
-// OnAction sets the handler which is called when an action is received for this
-// attribute. This allows the implementer to forward the request to the end
-// device.
-func (attr *Float) OnAction(handler func(val float64)) {
-	attr.onAction = handler
-}
+type Float struct{ base }
 
 // Static assert that Float implements the Attribute interface.
 var _ Attribute = (*Float)(nil)
 
-func (attr *Float) ID() string                            { return attr.id }
-func (attr *Float) Perms() clientsapi.Permissions         { return attr.perms }
-func (attr *Float) Optional() OptionalType                { return attr.optional }
-func (attr *Float) IsSet() bool                           { return attr.isSet }
-func (attr *Float) Push(push func(*clientsapi.Attribute)) { attr.push = push }
-func (attr *Float) Pb() *clientsapi.Attribute {
-	return &clientsapi.Attribute{
-		Id: attr.id,
-		Float: &clientsapi.FloatAttribute{
-			Value: attr.value,
-			Min:   attr.min,
-			Max:   attr.max,
-			Step:  attr.step,
-			Unit:  attr.unit,
-			Perms: attr.perms,
-		},
+// NewFloat creates a float attribute. A nil spec means no limits and no unit.
+func NewFloat(id string, perms clientsapi.Permissions, optional OptionalType, spec *clientsapi.FloatSpec) *Float {
+	if spec == nil {
+		spec = &clientsapi.FloatSpec{}
 	}
+	return &Float{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: spec}})}
+}
+
+func (attr *Float) Get() float64 { return attr.value.GetFloat() }
+
+// FloatSpec returns a copy of the limits and unit.
+func (attr *Float) FloatSpec() *clientsapi.FloatSpec {
+	return proto.Clone(attr.spec.GetFloat()).(*clientsapi.FloatSpec)
+}
+
+// SetFloatSpec replaces the limits and unit.
+func (attr *Float) SetFloatSpec(spec *clientsapi.FloatSpec) bool {
+	return attr.setSpec(&clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: spec}})
+}
+
+// SetRange replaces min and max, keeping step and unit.
+func (attr *Float) SetRange(min, max float64) bool {
+	spec := attr.FloatSpec()
+	spec.Min, spec.Max = &min, &max
+	return attr.SetFloatSpec(spec)
+}
+
+// Set sets the value, stamped by the server on receipt. Changes of 0.0001 or
+// less are ignored. Reports whether it changed.
+func (attr *Float) Set(value float64) bool { return attr.SetAt(value, time.Time{}) }
+
+// SetAt sets the value as observed by the device at t.
+func (attr *Float) SetAt(value float64, t time.Time) bool {
+	if attr.IsSet() && math.Abs(attr.Get()-value) <= 0.0001 {
+		return false
+	}
+	return attr.set(values.Float(value), t)
+}
+
+// OnWrite sets the handler called with a validated written value. Its error
+// becomes the action's error.
+func (attr *Float) OnWrite(handler func(val float64) error) {
+	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetFloat()) }
 }

@@ -1,122 +1,69 @@
 package attributes
 
 import (
-	"fmt"
 	"math"
+	"time"
 
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
+	"github.com/jimjibone/woodhouse-api/values"
 )
 
-type Color struct {
-	id       string
-	perms    clientsapi.Permissions
-	optional OptionalType
-	hue      float64
-	sat      float64
-	x        float64
-	y        float64
-	isSet    bool
-	push     func(*clientsapi.Attribute)
-	onAction func(huesat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY)
-}
-
-func NewColor(id string, perms clientsapi.Permissions, optional OptionalType) *Color {
-	return &Color{
-		id:       id,
-		perms:    perms,
-		optional: optional,
-	}
-}
-
-func (attr *Color) SetOptional(optional OptionalType) {
-	attr.optional = optional
-}
-
-func (attr *Color) Get() (hue, sat, x, y float64) {
-	return attr.hue, attr.sat, attr.x, attr.y
-}
-
-func (attr *Color) Set(hue, sat, x, y float64) bool {
-	attr.isSet = true
-	if math.Abs(attr.hue-hue) > 0.001 ||
-		math.Abs(attr.sat-sat) > 0.001 ||
-		math.Abs(attr.x-x) > 0.001 ||
-		math.Abs(attr.y-y) > 0.001 {
-		attr.hue = hue
-		attr.sat = sat
-		attr.x = x
-		attr.y = y
-		if attr.push != nil {
-			attr.push(attr.Pb())
-		} else {
-			panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-		}
-		return true
-	}
-	return false
-}
-
-func (attr *Color) SetHueSat(hue, sat float64) bool {
-	attr.isSet = true
-	if math.Abs(attr.hue-hue) > 0.001 ||
-		math.Abs(attr.sat-sat) > 0.001 {
-		attr.hue = hue
-		attr.sat = sat
-		if attr.push != nil {
-			attr.push(attr.Pb())
-		} else {
-			panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-		}
-		return true
-	}
-	return false
-}
-
-func (attr *Color) SetXY(x, y float64) bool {
-	attr.isSet = true
-	if math.Abs(attr.x-x) > 0.001 ||
-		math.Abs(attr.y-y) > 0.001 {
-		attr.x = x
-		attr.y = y
-		if attr.push != nil {
-			attr.push(attr.Pb())
-		} else {
-			panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-		}
-		return true
-	}
-	return false
-}
-
-// HandleAction calls the attribute's OnAction handler if set.
-func (attr *Color) HandleAction(val *clientsapi.ColorValue) {
-	if attr.onAction != nil {
-		attr.onAction(val.GetHueSat(), val.GetXy())
-	}
-}
-
-// OnAction sets the handler which is called when an action is received for this
-// attribute. This allows the implementer to forward the request to the end
-// device.
-func (attr *Color) OnAction(handler func(huesat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY)) {
-	attr.onAction = handler
-}
+type Color struct{ base }
 
 // Static assert that Color implements the Attribute interface.
 var _ Attribute = (*Color)(nil)
 
-func (attr *Color) ID() string                            { return attr.id }
-func (attr *Color) Perms() clientsapi.Permissions         { return attr.perms }
-func (attr *Color) Optional() OptionalType                { return attr.optional }
-func (attr *Color) IsSet() bool                           { return attr.isSet }
-func (attr *Color) Push(push func(*clientsapi.Attribute)) { attr.push = push }
-func (attr *Color) Pb() *clientsapi.Attribute {
-	return &clientsapi.Attribute{
-		Id: attr.id,
-		Color: &clientsapi.ColorAttribute{
-			HueSat: &clientsapi.ColorHueSat{Hue: attr.hue, Sat: attr.sat},
-			Xy:     &clientsapi.ColorXY{X: attr.x, Y: attr.y},
-			Perms:  attr.perms,
-		},
+// NewColor creates a color attribute accepting the given encodings.
+func NewColor(id string, perms clientsapi.Permissions, optional OptionalType, hueSat, xy bool) *Color {
+	spec := &clientsapi.ColorSpec{HueSat: hueSat, Xy: xy}
+	return &Color{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Color{Color: spec}})}
+}
+
+// Get returns the color. Either encoding may be nil.
+func (attr *Color) Get() (hueSat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY) {
+	c := attr.value.GetColor()
+	return c.GetHueSat(), c.GetXy()
+}
+
+// SetHueSat sets a hue/saturation color, stamped by the server on receipt.
+// Changes of 0.001 or less are ignored. Reports whether it changed.
+func (attr *Color) SetHueSat(hue, sat float64) bool {
+	return attr.SetAt(&clientsapi.ColorHueSat{Hue: hue, Sat: sat}, nil, time.Time{})
+}
+
+// SetXY sets a CIE 1931 xy color, stamped by the server on receipt.
+func (attr *Color) SetXY(x, y float64) bool {
+	return attr.SetAt(nil, &clientsapi.ColorXY{X: x, Y: y}, time.Time{})
+}
+
+// SetAt sets the color as observed by the device at t (zero: the server
+// stamps it). Either encoding may be nil.
+func (attr *Color) SetAt(hueSat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY, t time.Time) bool {
+	oldHS, oldXY := attr.Get()
+	if attr.IsSet() && closeHueSat(oldHS, hueSat) && closeXY(oldXY, xy) {
+		return false
 	}
+	return attr.set(values.Color(hueSat, xy), t)
+}
+
+// OnWrite sets the handler called with a validated written color. Either
+// encoding may be nil, never both. Its error becomes the action's error.
+func (attr *Color) OnWrite(handler func(hueSat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY) error) {
+	attr.onWrite = func(v *clientsapi.Value) error {
+		return handler(v.GetColor().GetHueSat(), v.GetColor().GetXy())
+	}
+}
+
+func closeHueSat(a, b *clientsapi.ColorHueSat) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return math.Abs(a.Hue-b.Hue) <= 0.001 && math.Abs(a.Sat-b.Sat) <= 0.001
+}
+
+func closeXY(a, b *clientsapi.ColorXY) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return math.Abs(a.X-b.X) <= 0.001 && math.Abs(a.Y-b.Y) <= 0.001
 }

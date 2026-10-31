@@ -1,85 +1,32 @@
 package attributes
 
 import (
-	"fmt"
+	"time"
 
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
+	"github.com/jimjibone/woodhouse-api/values"
 )
 
-type Text struct {
-	id       string
-	perms    clientsapi.Permissions
-	optional OptionalType
-	value    string
-	isSet    bool
-	push     func(*clientsapi.Attribute)
-	onAction func(val string)
-}
-
-func NewText(id string, perms clientsapi.Permissions, optional OptionalType) *Text {
-	return &Text{
-		id:       id,
-		perms:    perms,
-		optional: optional,
-	}
-}
-
-func (attr *Text) SetOptional(optional OptionalType) {
-	attr.optional = optional
-}
-
-// SetPerms changes the attribute's permissions. Should be called before adding
-// the attribute to the bridge.
-func (attr *Text) SetPerms(perms clientsapi.Permissions) {
-	attr.perms = perms
-}
-
-func (attr *Text) Get() string {
-	return attr.value
-}
-
-func (attr *Text) Set(value string) bool {
-	attr.isSet = true
-	if attr.value != value {
-		attr.value = value
-		if attr.push != nil {
-			attr.push(attr.Pb())
-		} else {
-			panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-		}
-		return true
-	}
-	return false
-}
-
-// HandleAction calls the attribute's OnAction handler if set.
-func (attr *Text) HandleAction(val *clientsapi.TextValue) {
-	if attr.onAction != nil {
-		attr.onAction(val.GetValue())
-	}
-}
-
-// OnAction sets the handler which is called when an action is received for this
-// attribute. This allows the implementer to forward the request to the end
-// device.
-func (attr *Text) OnAction(handler func(val string)) {
-	attr.onAction = handler
-}
+type Text struct{ base }
 
 // Static assert that Text implements the Attribute interface.
 var _ Attribute = (*Text)(nil)
 
-func (attr *Text) ID() string                            { return attr.id }
-func (attr *Text) Perms() clientsapi.Permissions         { return attr.perms }
-func (attr *Text) Optional() OptionalType                { return attr.optional }
-func (attr *Text) IsSet() bool                           { return attr.isSet }
-func (attr *Text) Push(push func(*clientsapi.Attribute)) { attr.push = push }
-func (attr *Text) Pb() *clientsapi.Attribute {
-	return &clientsapi.Attribute{
-		Id: attr.id,
-		Text: &clientsapi.TextAttribute{
-			Value: attr.value,
-			Perms: attr.perms,
-		},
-	}
+func NewText(id string, perms clientsapi.Permissions, optional OptionalType) *Text {
+	return &Text{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}})}
+}
+
+func (attr *Text) Get() string { return attr.value.GetText() }
+
+// Set sets the value, stamped by the server on receipt. Reports whether it
+// changed.
+func (attr *Text) Set(value string) bool { return attr.set(values.Text(value), time.Time{}) }
+
+// SetAt sets the value as observed by the device at t.
+func (attr *Text) SetAt(value string, t time.Time) bool { return attr.set(values.Text(value), t) }
+
+// OnWrite sets the handler called with a validated written value. Its error
+// becomes the action's error.
+func (attr *Text) OnWrite(handler func(val string) error) {
+	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetText()) }
 }

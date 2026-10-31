@@ -1,92 +1,60 @@
 package attributes
 
 import (
-	"fmt"
 	"time"
 
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
+	"github.com/jimjibone/woodhouse-api/values"
+	"google.golang.org/protobuf/proto"
 )
 
-type Duration struct {
-	id       string
-	perms    clientsapi.Permissions
-	optional OptionalType
-	min      time.Duration
-	max      time.Duration
-	step     time.Duration
-	value    time.Duration
-	isSet    bool
-	push     func(*clientsapi.Attribute)
-	onAction func(val time.Duration)
-}
-
-func NewDuration(id string, perms clientsapi.Permissions, optional OptionalType, min, max, step time.Duration) *Duration {
-	if step < 0 {
-		step = -step
-	}
-	return &Duration{
-		id:       id,
-		perms:    perms,
-		optional: optional,
-		min:      min,
-		max:      max,
-		step:     step,
-	}
-}
-
-func (attr *Duration) SetOptional(optional OptionalType) {
-	attr.optional = optional
-}
-
-func (attr *Duration) Get() time.Duration {
-	return attr.value
-}
-
-func (attr *Duration) Set(value time.Duration) bool {
-	attr.isSet = true
-	if attr.value != value {
-		attr.value = value
-		if attr.push != nil {
-			attr.push(attr.Pb())
-		} else {
-			panic(fmt.Sprintf("attribute %q is not registered with a service", attr.id))
-		}
-		return true
-	}
-	return false
-}
-
-// HandleAction calls the attribute's OnAction handler if set.
-func (attr *Duration) HandleAction(val *clientsapi.DurationValue) {
-	if attr.onAction != nil {
-		attr.onAction(time.Duration(val.GetValue()) * time.Millisecond)
-	}
-}
-
-// OnAction sets the handler which is called when an action is received for this
-// attribute. This allows the implementer to forward the request to the end
-// device.
-func (attr *Duration) OnAction(handler func(val time.Duration)) {
-	attr.onAction = handler
-}
+type Duration struct{ base }
 
 // Static assert that Duration implements the Attribute interface.
 var _ Attribute = (*Duration)(nil)
 
-func (attr *Duration) ID() string                            { return attr.id }
-func (attr *Duration) Perms() clientsapi.Permissions         { return attr.perms }
-func (attr *Duration) Optional() OptionalType                { return attr.optional }
-func (attr *Duration) IsSet() bool                           { return attr.isSet }
-func (attr *Duration) Push(push func(*clientsapi.Attribute)) { attr.push = push }
-func (attr *Duration) Pb() *clientsapi.Attribute {
-	return &clientsapi.Attribute{
-		Id: attr.id,
-		Duration: &clientsapi.DurationAttribute{
-			Value: int64(attr.value / time.Millisecond),
-			Min:   int64(attr.min / time.Millisecond),
-			Max:   int64(attr.max / time.Millisecond),
-			Step:  uint64(attr.step / time.Millisecond),
-			Perms: attr.perms,
-		},
+// NewDuration creates a duration attribute. A nil spec means no limits.
+func NewDuration(id string, perms clientsapi.Permissions, optional OptionalType, spec *clientsapi.DurationSpec) *Duration {
+	if spec == nil {
+		spec = &clientsapi.DurationSpec{}
+	}
+	return &Duration{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: spec}})}
+}
+
+func (attr *Duration) Get() time.Duration {
+	d, _ := values.AsDuration(attr.value)
+	return d
+}
+
+// DurationSpec returns a copy of the limits.
+func (attr *Duration) DurationSpec() *clientsapi.DurationSpec {
+	return proto.Clone(attr.spec.GetDuration()).(*clientsapi.DurationSpec)
+}
+
+// SetRange replaces min and max, keeping step.
+func (attr *Duration) SetRange(min, max time.Duration) bool {
+	spec := attr.DurationSpec()
+	lo, hi := min.Milliseconds(), max.Milliseconds()
+	spec.Min, spec.Max = &lo, &hi
+	return attr.setSpec(&clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: spec}})
+}
+
+// Set sets the value (millisecond resolution), stamped by the server on
+// receipt. Reports whether it changed.
+func (attr *Duration) Set(value time.Duration) bool {
+	return attr.set(values.Duration(value), time.Time{})
+}
+
+// SetAt sets the value as observed by the device at t.
+func (attr *Duration) SetAt(value time.Duration, t time.Time) bool {
+	return attr.set(values.Duration(value), t)
+}
+
+// OnWrite sets the handler called with a validated written value. Its error
+// becomes the action's error.
+func (attr *Duration) OnWrite(handler func(val time.Duration) error) {
+	attr.onWrite = func(v *clientsapi.Value) error {
+		d, _ := values.AsDuration(v)
+		return handler(d)
 	}
 }
