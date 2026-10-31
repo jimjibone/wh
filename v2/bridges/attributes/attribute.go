@@ -1,0 +1,19 @@
+package attributes
+
+import clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
+
+type OptionalType int
+
+const (
+	Optional OptionalType = iota
+	Required
+)
+
+type Attribute interface {
+	ID() string
+	Perms() clientsapi.Permissions
+	Optional() OptionalType
+	IsSet() bool
+	Push(push func(*clientsapi.Attribute))
+	Pb() *clientsapi.Attribute
+}

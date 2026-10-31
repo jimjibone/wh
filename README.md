@@ -2,14 +2,14 @@
 
 This repository contains the Woodhouse client Go module.
 
-The module code is stored in major version directories, with there currently
-only being version 1. In the future we may introduce new versions, so this
-separation can enable backwards compatibility if we choose to support it.
+The module code is stored in a major version directory matching the
+woodhouse-api version it implements. Only the current version is kept: version
+2 replaced version 1 outright.
 
-## Version 1
+## Version 2
 
 This is the current and only version of the module and all files can be found
-under `v1/`.
+under `v2/`. Examples are under `examples/v2-bridge` and `examples/v2-reactor`.
 
 The woodhouse client code takes care of connecting to the woodhouse-core server.
 After the woodhouse-core user has approved the pairing of the client it will be

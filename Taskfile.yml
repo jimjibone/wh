@@ -4,8 +4,8 @@ tasks:
   build-examples:
     desc: Build the example bridge and reactor
     cmds:
-      - go build -o build/example-bridge ./examples/v1-bridge
-      - go build -o build/example-reactor ./examples/v1-reactor
+      - go build -o build/example-bridge ./examples/v2-bridge
+      - go build -o build/example-reactor ./examples/v2-reactor
 
   run-example-bridge:
     desc: Build and run the example bridge
