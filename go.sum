@@ -28,6 +28,8 @@ github.com/jimjibone/woodhouse-api v0.0.0-20261031000000-8cb7014d7c2e h1:tnGLuhO
 github.com/jimjibone/woodhouse-api v0.0.0-20261031000000-8cb7014d7c2e/go.mod h1:9RB6mPgL57DtQ4ZDrThlkZWU48GuVGcHxDErKJMpBQ8=
 github.com/jimjibone/woodhouse-api v0.0.0-20261031000300-2cd1f1316285 h1:zGfs0atlGCmuHPR/fbZH2IMAyS1qmRUBjKzPOG+XPxo=
 github.com/jimjibone/woodhouse-api v0.0.0-20261031000300-2cd1f1316285/go.mod h1:9RB6mPgL57DtQ4ZDrThlkZWU48GuVGcHxDErKJMpBQ8=
+github.com/jimjibone/woodhouse-api v0.0.0-20261031000742-e3b1afece080 h1:wuFNKNeO/cAttRKnTtiosxV9WAYxrTNouX27BL1Of1M=
+github.com/jimjibone/woodhouse-api v0.0.0-20261031000742-e3b1afece080/go.mod h1:9RB6mPgL57DtQ4ZDrThlkZWU48GuVGcHxDErKJMpBQ8=
 github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHPsaIE=
 github.com/mattn/go-colorable v0.1.14/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=

@@ -1,6 +1,11 @@
 version: 3
 
 tasks:
+  generate:
+    desc: Regenerate the typed services from the woodhouse-api schema
+    cmds:
+      - go generate ./...
+
   build-examples:
     desc: Build the example bridge and reactor
     cmds:

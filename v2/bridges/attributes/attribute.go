@@ -70,6 +70,18 @@ func (b *base) Push(push func(*clientsapi.Attribute)) { b.push = push }
 // SetOptional changes whether the attribute is sent before it has a value.
 func (b *base) SetOptional(optional OptionalType) { b.optional = optional }
 
+// SetPerms changes the permissions, e.g. to make a schema rw attribute read
+// only when the device cannot be written. Changes are pushed.
+func (b *base) SetPerms(perms clientsapi.Permissions) {
+	if b.perms == perms {
+		return
+	}
+	b.perms = perms
+	if b.push != nil {
+		b.push(b.Pb())
+	}
+}
+
 // Time returns when the current value was observed, or the zero time if the
 // server stamps it.
 func (b *base) Time() time.Time { return b.at }
