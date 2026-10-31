@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jimjibone/wh/v2/bridges/attributes"
+	"github.com/jimjibone/wh/v2/types"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
 	"github.com/jimjibone/woodhouse-api/values"
 )
@@ -14,6 +15,7 @@ import (
 var (
 	_ time.Duration
 	_ attributes.Attribute
+	_ = types.DurationOf
 	_ *clientsapi.Value
 	_ = values.Bool
 )
@@ -89,9 +91,9 @@ func NewIdentify(id string) *Identify {
 
 // OnIdentify sets the handler for the identify command. Params arrive validated against
 // the spec.
-func (srv *Identify) OnIdentify(handler func(p IdentifyIdentifyParams) error) {
+func (srv *Identify) OnIdentify(handler func(p types.IdentifyIdentifyParams) error) {
 	srv.OnCommand("identify", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseIdentifyIdentifyParams(params))
+		return nil, handler(types.ParseIdentifyIdentifyParams(params))
 	})
 }
 
@@ -240,9 +242,9 @@ func NewLight(id string, features ...string) *Light {
 
 // OnSet sets the handler for the set command. Change several values at once, optionally with a transition. Params arrive validated against
 // the spec.
-func (srv *Light) OnSet(handler func(p LightSetParams) error) {
+func (srv *Light) OnSet(handler func(p types.LightSetParams) error) {
 	srv.OnCommand("set", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseLightSetParams(params))
+		return nil, handler(types.ParseLightSetParams(params))
 	})
 }
 
@@ -304,18 +306,18 @@ func (srv *Cover) OnStop(handler func() error) {
 // OnGoTo sets the handler for the go_to command. Params arrive validated against
 // the spec.
 // It panics unless one of the features position is enabled.
-func (srv *Cover) OnGoTo(handler func(p CoverGoToParams) error) {
+func (srv *Cover) OnGoTo(handler func(p types.CoverGoToParams) error) {
 	srv.OnCommand("go_to", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseCoverGoToParams(params))
+		return nil, handler(types.ParseCoverGoToParams(params))
 	})
 }
 
 // OnTiltTo sets the handler for the tilt_to command. Params arrive validated against
 // the spec.
 // It panics unless one of the features tilt is enabled.
-func (srv *Cover) OnTiltTo(handler func(p CoverTiltToParams) error) {
+func (srv *Cover) OnTiltTo(handler func(p types.CoverTiltToParams) error) {
 	srv.OnCommand("tilt_to", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseCoverTiltToParams(params))
+		return nil, handler(types.ParseCoverTiltToParams(params))
 	})
 }
 
@@ -356,22 +358,22 @@ func NewThermostat(id string, features ...string) *Thermostat {
 }
 
 // SetSchedule sets schedule, stamped by the server on receipt. Reports whether it changed.
-func (srv *Thermostat) SetSchedule(v []ThermostatScheduleItem) bool {
+func (srv *Thermostat) SetSchedule(v []types.ThermostatScheduleItem) bool {
 	return srv.Schedule.Set(func() *clientsapi.Value {
 		items := make([]*clientsapi.Value, 0, len(v))
 		for _, it := range v {
-			items = append(items, it.value())
+			items = append(items, it.Value())
 		}
 		return values.List(items...)
 	}().GetList().GetItems())
 }
 
 // ScheduleItems returns schedule.
-func (srv *Thermostat) ScheduleItems() []ThermostatScheduleItem {
-	return func() []ThermostatScheduleItem {
-		var out []ThermostatScheduleItem
+func (srv *Thermostat) ScheduleItems() []types.ThermostatScheduleItem {
+	return func() []types.ThermostatScheduleItem {
+		var out []types.ThermostatScheduleItem
 		for _, it := range values.List(srv.Schedule.Get()...).GetList().GetItems() {
-			out = append(out, parseThermostatScheduleItem(it.GetStruct().GetFields()))
+			out = append(out, types.ParseThermostatScheduleItem(it.GetStruct().GetFields()))
 		}
 		return out
 	}()
@@ -380,9 +382,9 @@ func (srv *Thermostat) ScheduleItems() []ThermostatScheduleItem {
 // OnSetSchedule sets the handler for the set_schedule command. Params arrive validated against
 // the spec.
 // It panics unless one of the features schedule is enabled.
-func (srv *Thermostat) OnSetSchedule(handler func(p ThermostatSetScheduleParams) error) {
+func (srv *Thermostat) OnSetSchedule(handler func(p types.ThermostatSetScheduleParams) error) {
 	srv.OnCommand("set_schedule", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseThermostatSetScheduleParams(params))
+		return nil, handler(types.ParseThermostatSetScheduleParams(params))
 	})
 }
 
@@ -406,8 +408,8 @@ func NewBinaryInput(id string) *BinaryInput {
 }
 
 // EmitChanged emits the changed event, seen now.
-func (srv *BinaryInput) EmitChanged(e BinaryInputChangedEvent) error {
-	return srv.Emit("changed", e.fields()...)
+func (srv *BinaryInput) EmitChanged(e types.BinaryInputChangedEvent) error {
+	return srv.Emit("changed", e.Fields()...)
 }
 
 // AnalogInput: A raw analogue input signal.
@@ -441,13 +443,13 @@ func NewAnalogInput(id string, features ...string) *AnalogInput {
 }
 
 // SetRangeMap sets range_map, stamped by the server on receipt. Reports whether it changed.
-func (srv *AnalogInput) SetRangeMap(v AnalogInputRangeMap) bool {
-	return srv.RangeMap.Set(v.fields())
+func (srv *AnalogInput) SetRangeMap(v types.AnalogInputRangeMap) bool {
+	return srv.RangeMap.Set(v.Fields())
 }
 
 // RangeMapValue returns range_map.
-func (srv *AnalogInput) RangeMapValue() AnalogInputRangeMap {
-	return parseAnalogInputRangeMap(srv.RangeMap.Get())
+func (srv *AnalogInput) RangeMapValue() types.AnalogInputRangeMap {
+	return types.ParseAnalogInputRangeMap(srv.RangeMap.Get())
 }
 
 // Button: A momentary button. Each press is an event; last_event holds the latest for display.
@@ -487,13 +489,13 @@ func (srv *Button) EmitHold() error {
 }
 
 // EmitLongRelease emits the long_release event, seen now.
-func (srv *Button) EmitLongRelease(e ButtonLongReleaseEvent) error {
-	return srv.Emit("long_release", e.fields()...)
+func (srv *Button) EmitLongRelease(e types.ButtonLongReleaseEvent) error {
+	return srv.Emit("long_release", e.Fields()...)
 }
 
 // EmitMultiPress emits the multi_press event, seen now.
-func (srv *Button) EmitMultiPress(e ButtonMultiPressEvent) error {
-	return srv.Emit("multi_press", e.fields()...)
+func (srv *Button) EmitMultiPress(e types.ButtonMultiPressEvent) error {
+	return srv.Emit("multi_press", e.Fields()...)
 }
 
 // Contact: A contact sensor, e.g. on a door or window.
@@ -676,8 +678,8 @@ func NewCamera(id string, features ...string) *Camera {
 }
 
 // EmitDetection emits the detection event, seen now.
-func (srv *Camera) EmitDetection(e CameraDetectionEvent) error {
-	return srv.Emit("detection", e.fields()...)
+func (srv *Camera) EmitDetection(e types.CameraDetectionEvent) error {
+	return srv.Emit("detection", e.Fields()...)
 }
 
 // MediaPlayback: Media playback state and transport controls.
@@ -787,9 +789,9 @@ func NewVolume(id string, features ...string) *Volume {
 
 // OnStep sets the handler for the step command. Params arrive validated against
 // the spec.
-func (srv *Volume) OnStep(handler func(p VolumeStepParams) error) {
+func (srv *Volume) OnStep(handler func(p types.VolumeStepParams) error) {
 	srv.OnCommand("step", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseVolumeStepParams(params))
+		return nil, handler(types.ParseVolumeStepParams(params))
 	})
 }
 
@@ -813,22 +815,22 @@ func NewMediaSources(id string) *MediaSources {
 }
 
 // SetSources sets sources, stamped by the server on receipt. Reports whether it changed.
-func (srv *MediaSources) SetSources(v []MediaSourcesSourcesItem) bool {
+func (srv *MediaSources) SetSources(v []types.MediaSourcesSourcesItem) bool {
 	return srv.Sources.Set(func() *clientsapi.Value {
 		items := make([]*clientsapi.Value, 0, len(v))
 		for _, it := range v {
-			items = append(items, it.value())
+			items = append(items, it.Value())
 		}
 		return values.List(items...)
 	}().GetList().GetItems())
 }
 
 // SourcesItems returns sources.
-func (srv *MediaSources) SourcesItems() []MediaSourcesSourcesItem {
-	return func() []MediaSourcesSourcesItem {
-		var out []MediaSourcesSourcesItem
+func (srv *MediaSources) SourcesItems() []types.MediaSourcesSourcesItem {
+	return func() []types.MediaSourcesSourcesItem {
+		var out []types.MediaSourcesSourcesItem
 		for _, it := range values.List(srv.Sources.Get()...).GetList().GetItems() {
-			out = append(out, parseMediaSourcesSourcesItem(it.GetStruct().GetFields()))
+			out = append(out, types.ParseMediaSourcesSourcesItem(it.GetStruct().GetFields()))
 		}
 		return out
 	}()
@@ -836,9 +838,9 @@ func (srv *MediaSources) SourcesItems() []MediaSourcesSourcesItem {
 
 // OnPlay sets the handler for the play command. Params arrive validated against
 // the spec.
-func (srv *MediaSources) OnPlay(handler func(p MediaSourcesPlayParams) error) {
+func (srv *MediaSources) OnPlay(handler func(p types.MediaSourcesPlayParams) error) {
 	srv.OnCommand("play", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseMediaSourcesPlayParams(params))
+		return nil, handler(types.ParseMediaSourcesPlayParams(params))
 	})
 }
 
@@ -861,9 +863,9 @@ func NewRemote(id string) *Remote {
 
 // OnSendKey sets the handler for the send_key command. Params arrive validated against
 // the spec.
-func (srv *Remote) OnSendKey(handler func(p RemoteSendKeyParams) error) {
+func (srv *Remote) OnSendKey(handler func(p types.RemoteSendKeyParams) error) {
 	srv.OnCommand("send_key", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseRemoteSendKeyParams(params))
+		return nil, handler(types.ParseRemoteSendKeyParams(params))
 	})
 }
 
@@ -903,22 +905,22 @@ func NewPairing(id string, features ...string) *Pairing {
 }
 
 // SetRecent sets recent, stamped by the server on receipt. Reports whether it changed.
-func (srv *Pairing) SetRecent(v []PairingRecentItem) bool {
+func (srv *Pairing) SetRecent(v []types.PairingRecentItem) bool {
 	return srv.Recent.Set(func() *clientsapi.Value {
 		items := make([]*clientsapi.Value, 0, len(v))
 		for _, it := range v {
-			items = append(items, it.value())
+			items = append(items, it.Value())
 		}
 		return values.List(items...)
 	}().GetList().GetItems())
 }
 
 // RecentItems returns recent.
-func (srv *Pairing) RecentItems() []PairingRecentItem {
-	return func() []PairingRecentItem {
-		var out []PairingRecentItem
+func (srv *Pairing) RecentItems() []types.PairingRecentItem {
+	return func() []types.PairingRecentItem {
+		var out []types.PairingRecentItem
 		for _, it := range values.List(srv.Recent.Get()...).GetList().GetItems() {
-			out = append(out, parsePairingRecentItem(it.GetStruct().GetFields()))
+			out = append(out, types.ParsePairingRecentItem(it.GetStruct().GetFields()))
 		}
 		return out
 	}()
@@ -926,13 +928,13 @@ func (srv *Pairing) RecentItems() []PairingRecentItem {
 
 // OnStart sets the handler for the start command. Params arrive validated against
 // the spec.
-func (srv *Pairing) OnStart(handler func(p PairingStartParams) (PairingStartResult, error)) {
+func (srv *Pairing) OnStart(handler func(p types.PairingStartParams) (types.PairingStartResult, error)) {
 	srv.OnCommand("start", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		r, err := handler(parsePairingStartParams(params))
+		r, err := handler(types.ParsePairingStartParams(params))
 		if err != nil {
 			return nil, err
 		}
-		return r.fields(), nil
+		return r.Fields(), nil
 	})
 }
 
@@ -947,20 +949,20 @@ func (srv *Pairing) OnStop(handler func() error) {
 // OnSubmitCode sets the handler for the submit_code command. Params arrive validated against
 // the spec.
 // It panics unless one of the features code_entry is enabled.
-func (srv *Pairing) OnSubmitCode(handler func(p PairingSubmitCodeParams) error) {
+func (srv *Pairing) OnSubmitCode(handler func(p types.PairingSubmitCodeParams) error) {
 	srv.OnCommand("submit_code", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parsePairingSubmitCodeParams(params))
+		return nil, handler(types.ParsePairingSubmitCodeParams(params))
 	})
 }
 
 // EmitPaired emits the paired event, seen now.
-func (srv *Pairing) EmitPaired(e PairingPairedEvent) error {
-	return srv.Emit("paired", e.fields()...)
+func (srv *Pairing) EmitPaired(e types.PairingPairedEvent) error {
+	return srv.Emit("paired", e.Fields()...)
 }
 
 // EmitFailed emits the failed event, seen now.
-func (srv *Pairing) EmitFailed(e PairingFailedEvent) error {
-	return srv.Emit("failed", e.fields()...)
+func (srv *Pairing) EmitFailed(e types.PairingFailedEvent) error {
+	return srv.Emit("failed", e.Fields()...)
 }
 
 // Sharing: Lets another controller or ecosystem add this device (e.g. a Matter commissioning window).
@@ -990,9 +992,9 @@ func NewSharing(id string) *Sharing {
 
 // OnOpen sets the handler for the open command. Params arrive validated against
 // the spec.
-func (srv *Sharing) OnOpen(handler func(p SharingOpenParams) error) {
+func (srv *Sharing) OnOpen(handler func(p types.SharingOpenParams) error) {
 	srv.OnCommand("open", func(params []*clientsapi.FieldValue, _ func(*clientsapi.ActionResponse)) ([]*clientsapi.FieldValue, error) {
-		return nil, handler(parseSharingOpenParams(params))
+		return nil, handler(types.ParseSharingOpenParams(params))
 	})
 }
 
@@ -1021,632 +1023,4 @@ func NewMode(id string) *Mode {
 		s.setup()
 	}
 	return srv
-}
-
-// IdentifyIdentifyParams are the params of identify.identify.
-type IdentifyIdentifyParams struct {
-	Duration *time.Duration // optional: How long to identify for. Device default when omitted.
-}
-
-func (x IdentifyIdentifyParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	if x.Duration != nil {
-		fs = append(fs, values.Field("duration", values.Duration((*x.Duration))))
-	}
-	return fs
-}
-
-func (x IdentifyIdentifyParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseIdentifyIdentifyParams(fs []*clientsapi.FieldValue) IdentifyIdentifyParams {
-	m := values.Fields(fs)
-	var x IdentifyIdentifyParams
-	if v, ok := m["duration"]; ok {
-		t := durationOf(v)
-		x.Duration = &t
-	}
-	return x
-}
-
-// LightSetParams are the params of light.set.
-type LightSetParams struct {
-	On         *bool                  // optional
-	Brightness *int64                 // feature brightness
-	ColorTemp  *int64                 // feature color_temp
-	Color      *clientsapi.ColorValue // feature hs or xy
-	Transition *time.Duration         // optional
-}
-
-func (x LightSetParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	if x.On != nil {
-		fs = append(fs, values.Field("on", values.Bool((*x.On))))
-	}
-	if x.Brightness != nil {
-		fs = append(fs, values.Field("brightness", values.Int((*x.Brightness))))
-	}
-	if x.ColorTemp != nil {
-		fs = append(fs, values.Field("color_temp", values.Int((*x.ColorTemp))))
-	}
-	if x.Color != nil {
-		fs = append(fs, values.Field("color", values.Color(x.Color.GetHueSat(), x.Color.GetXy())))
-	}
-	if x.Transition != nil {
-		fs = append(fs, values.Field("transition", values.Duration((*x.Transition))))
-	}
-	return fs
-}
-
-func (x LightSetParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseLightSetParams(fs []*clientsapi.FieldValue) LightSetParams {
-	m := values.Fields(fs)
-	var x LightSetParams
-	if v, ok := m["on"]; ok {
-		t := v.GetBool()
-		x.On = &t
-	}
-	if v, ok := m["brightness"]; ok {
-		t := v.GetInt()
-		x.Brightness = &t
-	}
-	if v, ok := m["color_temp"]; ok {
-		t := v.GetInt()
-		x.ColorTemp = &t
-	}
-	if v, ok := m["color"]; ok {
-		x.Color = v.GetColor()
-	}
-	if v, ok := m["transition"]; ok {
-		t := durationOf(v)
-		x.Transition = &t
-	}
-	return x
-}
-
-// CoverGoToParams are the params of cover.go_to.
-type CoverGoToParams struct {
-	Position int64 // required
-}
-
-func (x CoverGoToParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("position", values.Int(x.Position)))
-	return fs
-}
-
-func (x CoverGoToParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseCoverGoToParams(fs []*clientsapi.FieldValue) CoverGoToParams {
-	m := values.Fields(fs)
-	var x CoverGoToParams
-	if v, ok := m["position"]; ok {
-		x.Position = v.GetInt()
-	}
-	return x
-}
-
-// CoverTiltToParams are the params of cover.tilt_to.
-type CoverTiltToParams struct {
-	Tilt int64 // required
-}
-
-func (x CoverTiltToParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("tilt", values.Int(x.Tilt)))
-	return fs
-}
-
-func (x CoverTiltToParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseCoverTiltToParams(fs []*clientsapi.FieldValue) CoverTiltToParams {
-	m := values.Fields(fs)
-	var x CoverTiltToParams
-	if v, ok := m["tilt"]; ok {
-		x.Tilt = v.GetInt()
-	}
-	return x
-}
-
-type ThermostatScheduleItem struct {
-	Days     []string      // required
-	Start    time.Duration // required: Time of day the entry starts.
-	Setpoint float64       // required
-}
-
-func (x ThermostatScheduleItem) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("days", func() *clientsapi.Value {
-		items := make([]*clientsapi.Value, 0, len(x.Days))
-		for _, it := range x.Days {
-			items = append(items, values.Enum(it))
-		}
-		return values.List(items...)
-	}()))
-	fs = append(fs, values.Field("start", values.Duration(x.Start)))
-	fs = append(fs, values.Field("setpoint", values.Float(x.Setpoint)))
-	return fs
-}
-
-func (x ThermostatScheduleItem) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseThermostatScheduleItem(fs []*clientsapi.FieldValue) ThermostatScheduleItem {
-	m := values.Fields(fs)
-	var x ThermostatScheduleItem
-	if v, ok := m["days"]; ok {
-		x.Days = func() []string {
-			var out []string
-			for _, it := range v.GetList().GetItems() {
-				out = append(out, it.GetEnum())
-			}
-			return out
-		}()
-	}
-	if v, ok := m["start"]; ok {
-		x.Start = durationOf(v)
-	}
-	if v, ok := m["setpoint"]; ok {
-		x.Setpoint = v.GetFloat()
-	}
-	return x
-}
-
-// ThermostatSetScheduleParams are the params of thermostat.set_schedule.
-type ThermostatSetScheduleParams struct {
-	Schedule []ThermostatScheduleItem // required
-}
-
-func (x ThermostatSetScheduleParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("schedule", func() *clientsapi.Value {
-		items := make([]*clientsapi.Value, 0, len(x.Schedule))
-		for _, it := range x.Schedule {
-			items = append(items, it.value())
-		}
-		return values.List(items...)
-	}()))
-	return fs
-}
-
-func (x ThermostatSetScheduleParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseThermostatSetScheduleParams(fs []*clientsapi.FieldValue) ThermostatSetScheduleParams {
-	m := values.Fields(fs)
-	var x ThermostatSetScheduleParams
-	if v, ok := m["schedule"]; ok {
-		x.Schedule = func() []ThermostatScheduleItem {
-			var out []ThermostatScheduleItem
-			for _, it := range v.GetList().GetItems() {
-				out = append(out, parseThermostatScheduleItem(it.GetStruct().GetFields()))
-			}
-			return out
-		}()
-	}
-	return x
-}
-
-// BinaryInputChangedEvent are the fields of the binary_input.changed event.
-type BinaryInputChangedEvent struct {
-	On bool // required
-}
-
-func (x BinaryInputChangedEvent) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("on", values.Bool(x.On)))
-	return fs
-}
-
-func (x BinaryInputChangedEvent) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseBinaryInputChangedEvent(fs []*clientsapi.FieldValue) BinaryInputChangedEvent {
-	m := values.Fields(fs)
-	var x BinaryInputChangedEvent
-	if v, ok := m["on"]; ok {
-		x.On = v.GetBool()
-	}
-	return x
-}
-
-type AnalogInputRangeMap struct {
-	Min float64 // required
-	Max float64 // required
-}
-
-func (x AnalogInputRangeMap) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("min", values.Float(x.Min)))
-	fs = append(fs, values.Field("max", values.Float(x.Max)))
-	return fs
-}
-
-func (x AnalogInputRangeMap) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseAnalogInputRangeMap(fs []*clientsapi.FieldValue) AnalogInputRangeMap {
-	m := values.Fields(fs)
-	var x AnalogInputRangeMap
-	if v, ok := m["min"]; ok {
-		x.Min = v.GetFloat()
-	}
-	if v, ok := m["max"]; ok {
-		x.Max = v.GetFloat()
-	}
-	return x
-}
-
-// ButtonLongReleaseEvent are the fields of the button.long_release event.
-type ButtonLongReleaseEvent struct {
-	Duration time.Duration // required
-}
-
-func (x ButtonLongReleaseEvent) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("duration", values.Duration(x.Duration)))
-	return fs
-}
-
-func (x ButtonLongReleaseEvent) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseButtonLongReleaseEvent(fs []*clientsapi.FieldValue) ButtonLongReleaseEvent {
-	m := values.Fields(fs)
-	var x ButtonLongReleaseEvent
-	if v, ok := m["duration"]; ok {
-		x.Duration = durationOf(v)
-	}
-	return x
-}
-
-// ButtonMultiPressEvent are the fields of the button.multi_press event.
-type ButtonMultiPressEvent struct {
-	Count int64 // required
-}
-
-func (x ButtonMultiPressEvent) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("count", values.Int(x.Count)))
-	return fs
-}
-
-func (x ButtonMultiPressEvent) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseButtonMultiPressEvent(fs []*clientsapi.FieldValue) ButtonMultiPressEvent {
-	m := values.Fields(fs)
-	var x ButtonMultiPressEvent
-	if v, ok := m["count"]; ok {
-		x.Count = v.GetInt()
-	}
-	return x
-}
-
-// CameraDetectionEvent are the fields of the camera.detection event.
-type CameraDetectionEvent struct {
-	Label string   // required: What was detected, e.g. person or car.
-	Score *float64 // optional
-	Zone  *string  // optional
-}
-
-func (x CameraDetectionEvent) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("label", values.Text(x.Label)))
-	if x.Score != nil {
-		fs = append(fs, values.Field("score", values.Float((*x.Score))))
-	}
-	if x.Zone != nil {
-		fs = append(fs, values.Field("zone", values.Text((*x.Zone))))
-	}
-	return fs
-}
-
-func (x CameraDetectionEvent) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseCameraDetectionEvent(fs []*clientsapi.FieldValue) CameraDetectionEvent {
-	m := values.Fields(fs)
-	var x CameraDetectionEvent
-	if v, ok := m["label"]; ok {
-		x.Label = v.GetText()
-	}
-	if v, ok := m["score"]; ok {
-		t := v.GetFloat()
-		x.Score = &t
-	}
-	if v, ok := m["zone"]; ok {
-		t := v.GetText()
-		x.Zone = &t
-	}
-	return x
-}
-
-// VolumeStepParams are the params of volume.step.
-type VolumeStepParams struct {
-	Delta int64 // required
-}
-
-func (x VolumeStepParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("delta", values.Int(x.Delta)))
-	return fs
-}
-
-func (x VolumeStepParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseVolumeStepParams(fs []*clientsapi.FieldValue) VolumeStepParams {
-	m := values.Fields(fs)
-	var x VolumeStepParams
-	if v, ok := m["delta"]; ok {
-		x.Delta = v.GetInt()
-	}
-	return x
-}
-
-type MediaSourcesSourcesItem struct {
-	ID   string // required
-	Name string // required
-}
-
-func (x MediaSourcesSourcesItem) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("id", values.Text(x.ID)))
-	fs = append(fs, values.Field("name", values.Text(x.Name)))
-	return fs
-}
-
-func (x MediaSourcesSourcesItem) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseMediaSourcesSourcesItem(fs []*clientsapi.FieldValue) MediaSourcesSourcesItem {
-	m := values.Fields(fs)
-	var x MediaSourcesSourcesItem
-	if v, ok := m["id"]; ok {
-		x.ID = v.GetText()
-	}
-	if v, ok := m["name"]; ok {
-		x.Name = v.GetText()
-	}
-	return x
-}
-
-// MediaSourcesPlayParams are the params of media_sources.play.
-type MediaSourcesPlayParams struct {
-	ID string // required: id of an entry in sources.
-}
-
-func (x MediaSourcesPlayParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("id", values.Text(x.ID)))
-	return fs
-}
-
-func (x MediaSourcesPlayParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseMediaSourcesPlayParams(fs []*clientsapi.FieldValue) MediaSourcesPlayParams {
-	m := values.Fields(fs)
-	var x MediaSourcesPlayParams
-	if v, ok := m["id"]; ok {
-		x.ID = v.GetText()
-	}
-	return x
-}
-
-// RemoteSendKeyParams are the params of remote.send_key.
-type RemoteSendKeyParams struct {
-	Key string // required: Options are the keys the device accepts, set by the bridge.
-}
-
-func (x RemoteSendKeyParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("key", values.Enum(x.Key)))
-	return fs
-}
-
-func (x RemoteSendKeyParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseRemoteSendKeyParams(fs []*clientsapi.FieldValue) RemoteSendKeyParams {
-	m := values.Fields(fs)
-	var x RemoteSendKeyParams
-	if v, ok := m["key"]; ok {
-		x.Key = v.GetEnum()
-	}
-	return x
-}
-
-type PairingRecentItem struct {
-	DeviceID string    // required: Woodhouse device id, for linking to the device.
-	Name     *string   // optional
-	State    string    // required
-	Error    *string   // optional
-	Time     time.Time // required
-}
-
-func (x PairingRecentItem) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("device_id", values.Text(x.DeviceID)))
-	if x.Name != nil {
-		fs = append(fs, values.Field("name", values.Text((*x.Name))))
-	}
-	fs = append(fs, values.Field("state", values.Enum(x.State)))
-	if x.Error != nil {
-		fs = append(fs, values.Field("error", values.Text((*x.Error))))
-	}
-	fs = append(fs, values.Field("time", values.Time(x.Time)))
-	return fs
-}
-
-func (x PairingRecentItem) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parsePairingRecentItem(fs []*clientsapi.FieldValue) PairingRecentItem {
-	m := values.Fields(fs)
-	var x PairingRecentItem
-	if v, ok := m["device_id"]; ok {
-		x.DeviceID = v.GetText()
-	}
-	if v, ok := m["name"]; ok {
-		t := v.GetText()
-		x.Name = &t
-	}
-	if v, ok := m["state"]; ok {
-		x.State = v.GetEnum()
-	}
-	if v, ok := m["error"]; ok {
-		t := v.GetText()
-		x.Error = &t
-	}
-	if v, ok := m["time"]; ok {
-		x.Time = timeOf(v)
-	}
-	return x
-}
-
-// PairingStartParams are the params of pairing.start.
-type PairingStartParams struct {
-	Duration *time.Duration // feature timed_window
-}
-
-func (x PairingStartParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	if x.Duration != nil {
-		fs = append(fs, values.Field("duration", values.Duration((*x.Duration))))
-	}
-	return fs
-}
-
-func (x PairingStartParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parsePairingStartParams(fs []*clientsapi.FieldValue) PairingStartParams {
-	m := values.Fields(fs)
-	var x PairingStartParams
-	if v, ok := m["duration"]; ok {
-		t := durationOf(v)
-		x.Duration = &t
-	}
-	return x
-}
-
-// PairingStartResult is the result of pairing.start.
-type PairingStartResult struct {
-	Ends *time.Time // feature timed_window: When the pairing window closes.
-}
-
-func (x PairingStartResult) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	if x.Ends != nil {
-		fs = append(fs, values.Field("ends", values.Time((*x.Ends))))
-	}
-	return fs
-}
-
-func (x PairingStartResult) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parsePairingStartResult(fs []*clientsapi.FieldValue) PairingStartResult {
-	m := values.Fields(fs)
-	var x PairingStartResult
-	if v, ok := m["ends"]; ok {
-		t := timeOf(v)
-		x.Ends = &t
-	}
-	return x
-}
-
-// PairingSubmitCodeParams are the params of pairing.submit_code.
-type PairingSubmitCodeParams struct {
-	Code string // required
-}
-
-func (x PairingSubmitCodeParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("code", values.Text(x.Code)))
-	return fs
-}
-
-func (x PairingSubmitCodeParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parsePairingSubmitCodeParams(fs []*clientsapi.FieldValue) PairingSubmitCodeParams {
-	m := values.Fields(fs)
-	var x PairingSubmitCodeParams
-	if v, ok := m["code"]; ok {
-		x.Code = v.GetText()
-	}
-	return x
-}
-
-// PairingPairedEvent are the fields of the pairing.paired event.
-type PairingPairedEvent struct {
-	DeviceID string  // required
-	Name     *string // optional
-}
-
-func (x PairingPairedEvent) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	fs = append(fs, values.Field("device_id", values.Text(x.DeviceID)))
-	if x.Name != nil {
-		fs = append(fs, values.Field("name", values.Text((*x.Name))))
-	}
-	return fs
-}
-
-func (x PairingPairedEvent) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parsePairingPairedEvent(fs []*clientsapi.FieldValue) PairingPairedEvent {
-	m := values.Fields(fs)
-	var x PairingPairedEvent
-	if v, ok := m["device_id"]; ok {
-		x.DeviceID = v.GetText()
-	}
-	if v, ok := m["name"]; ok {
-		t := v.GetText()
-		x.Name = &t
-	}
-	return x
-}
-
-// PairingFailedEvent are the fields of the pairing.failed event.
-type PairingFailedEvent struct {
-	DeviceID *string // optional
-	Error    string  // required
-}
-
-func (x PairingFailedEvent) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	if x.DeviceID != nil {
-		fs = append(fs, values.Field("device_id", values.Text((*x.DeviceID))))
-	}
-	fs = append(fs, values.Field("error", values.Text(x.Error)))
-	return fs
-}
-
-func (x PairingFailedEvent) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parsePairingFailedEvent(fs []*clientsapi.FieldValue) PairingFailedEvent {
-	m := values.Fields(fs)
-	var x PairingFailedEvent
-	if v, ok := m["device_id"]; ok {
-		t := v.GetText()
-		x.DeviceID = &t
-	}
-	if v, ok := m["error"]; ok {
-		x.Error = v.GetText()
-	}
-	return x
-}
-
-// SharingOpenParams are the params of sharing.open.
-type SharingOpenParams struct {
-	Timeout *time.Duration // optional
-}
-
-func (x SharingOpenParams) fields() []*clientsapi.FieldValue {
-	var fs []*clientsapi.FieldValue
-	if x.Timeout != nil {
-		fs = append(fs, values.Field("timeout", values.Duration((*x.Timeout))))
-	}
-	return fs
-}
-
-func (x SharingOpenParams) value() *clientsapi.Value { return values.Struct(x.fields()...) }
-
-func parseSharingOpenParams(fs []*clientsapi.FieldValue) SharingOpenParams {
-	m := values.Fields(fs)
-	var x SharingOpenParams
-	if v, ok := m["timeout"]; ok {
-		t := durationOf(v)
-		x.Timeout = &t
-	}
-	return x
 }

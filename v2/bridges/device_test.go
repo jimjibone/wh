@@ -7,6 +7,7 @@ import (
 
 	"github.com/jimjibone/wh/v2/bridges/attributes"
 	"github.com/jimjibone/wh/v2/bridges/services"
+	"github.com/jimjibone/wh/v2/types"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
 	"github.com/jimjibone/woodhouse-api/values"
 )
@@ -73,7 +74,7 @@ func TestPartialUpdatesAndEventsCarryEndpoint(t *testing.T) {
 
 	outs[1].On.Set(true)
 	ins[1].On.Set(true)
-	if err := ins[1].EmitChanged(services.BinaryInputChangedEvent{On: true}); err != nil {
+	if err := ins[1].EmitChanged(types.BinaryInputChangedEvent{On: true}); err != nil {
 		t.Fatal(err)
 	}
 

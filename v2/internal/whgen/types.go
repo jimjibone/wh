@@ -9,7 +9,8 @@ import (
 )
 
 // structType is a Go struct generated for a schema struct, a list item struct,
-// or the params, result or fields of a command or event.
+// or the params, result or fields of a command or event. They live in package
+// types and are shared by the bridge services and the reactor views.
 type structType struct {
 	name   string
 	doc    string
@@ -19,15 +20,58 @@ type structType struct {
 }
 
 // types maps schema fields to Go types and conversion expressions, and
-// collects the struct types they need.
+// collects the struct types they need. qual qualifies the struct types and
+// their Parse funcs: "" inside package types, "types." elsewhere.
 type types struct {
+	qual    string
 	structs map[string]*structType
 	order   []string
 	err     error
 }
 
-func newTypes() *types {
-	return &types{structs: map[string]*structType{}}
+func newTypes(qual string) *types {
+	return &types{qual: qual, structs: map[string]*structType{}}
+}
+
+// collectStructs registers every struct type the schema needs, in a stable
+// order, so each generator agrees on the names.
+func collectStructs(t *types, s *schema.Schema) {
+	for _, srv := range s.Services {
+		if srv.Open {
+			continue
+		}
+		name := camel(srv.Name)
+		for _, a := range srv.Attributes {
+			if a.Type == schema.TypeList || a.Type == schema.TypeStruct {
+				t.goType(a, name+camel(a.Name))
+			}
+		}
+		for _, c := range srv.Commands {
+			if len(c.Params) > 0 {
+				t.addStruct(paramsName(srv, c), fmt.Sprintf("are the params of %s.%s.", srv.Name, c.Name), name, c.Params)
+			}
+			if len(c.Result) > 0 {
+				t.addStruct(resultName(srv, c), fmt.Sprintf("is the result of %s.%s.", srv.Name, c.Name), name, c.Result)
+			}
+		}
+		for _, e := range srv.Events {
+			if len(e.Fields) > 0 {
+				t.addStruct(eventName(srv, e), fmt.Sprintf("are the fields of the %s.%s event.", srv.Name, e.Name), name, e.Fields)
+			}
+		}
+	}
+}
+
+func paramsName(srv *schema.Service, c *schema.Command) string {
+	return camel(srv.Name) + camel(c.Name) + "Params"
+}
+
+func resultName(srv *schema.Service, c *schema.Command) string {
+	return camel(srv.Name) + camel(c.Name) + "Result"
+}
+
+func eventName(srv *schema.Service, e *schema.Event) string {
+	return camel(srv.Name) + camel(e.Name) + "Event"
 }
 
 // optionalPtr reports whether an optional field of this type is a pointer.
@@ -58,7 +102,7 @@ func (t *types) goType(f *schema.Field, typeName string) string {
 		return "[]" + t.goType(f.Item, typeName+"Item")
 	case schema.TypeStruct:
 		t.addStruct(typeName, "", typeName, f.Fields)
-		return typeName
+		return t.qual + typeName
 	}
 	t.fail("field %q: type %q has no Go type here", f.Name, f.Type)
 	return "any"
@@ -94,7 +138,7 @@ func (t *types) toValue(expr string, f *schema.Field, typeName string) string {
 	case schema.TypeColor:
 		return "values.Color(" + expr + ".GetHueSat(), " + expr + ".GetXy())"
 	case schema.TypeStruct:
-		return expr + ".value()"
+		return expr + ".Value()"
 	case schema.TypeList:
 		item := t.toValue("it", f.Item, typeName+"Item")
 		return "func() *clientsapi.Value { items := make([]*clientsapi.Value, 0, len(" + expr + ")); for _, it := range " + expr +
@@ -119,13 +163,13 @@ func (t *types) fromValue(expr string, f *schema.Field, typeName string) string 
 	case schema.TypeEnum:
 		return expr + ".GetEnum()"
 	case schema.TypeDuration:
-		return "durationOf(" + expr + ")"
+		return t.qual + "DurationOf(" + expr + ")"
 	case schema.TypeTime:
-		return "timeOf(" + expr + ")"
+		return t.qual + "TimeOf(" + expr + ")"
 	case schema.TypeColor:
 		return expr + ".GetColor()"
 	case schema.TypeStruct:
-		return "parse" + typeName + "(" + expr + ".GetStruct().GetFields())"
+		return t.qual + "Parse" + typeName + "(" + expr + ".GetStruct().GetFields())"
 	case schema.TypeList:
 		itemType := t.goType(f.Item, typeName+"Item")
 		item := t.fromValue("it", f.Item, typeName+"Item")
@@ -143,6 +187,9 @@ func (t *types) addStruct(name, doc, prefix string, fields []*schema.Field) {
 	if prev, ok := t.structs[name]; ok {
 		if prev.sig != sig {
 			t.fail("struct %s is generated twice with different fields", name)
+		}
+		if prev.doc == "" {
+			prev.doc = doc
 		}
 		return
 	}

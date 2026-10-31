@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jimjibone/wh/v2/bridges/attributes"
+	"github.com/jimjibone/wh/v2/types"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
 	"github.com/jimjibone/woodhouse-api/values"
 )
@@ -85,7 +86,7 @@ func TestFeaturesGateAttributesAndCommands(t *testing.T) {
 			t.Fatal("OnGoTo without feature position should panic")
 		}
 	}()
-	cover.OnGoTo(func(CoverGoToParams) error { return nil })
+	cover.OnGoTo(func(types.CoverGoToParams) error { return nil })
 }
 
 func TestUnknownFeaturePanics(t *testing.T) {
@@ -100,8 +101,8 @@ func TestUnknownFeaturePanics(t *testing.T) {
 func TestTypedCommand(t *testing.T) {
 	light := NewLight("", LightFeatureBrightness)
 	record(light)
-	var got LightSetParams
-	light.OnSet(func(p LightSetParams) error { got = p; return nil })
+	var got types.LightSetParams
+	light.OnSet(func(p types.LightSetParams) error { got = p; return nil })
 
 	_, err := invoke(light, "set", values.Field("brightness", values.Int(40)), values.Field("transition", values.Duration(3*time.Second)))
 	if err != nil {
@@ -128,11 +129,11 @@ func TestCommandResult(t *testing.T) {
 	pairing := NewPairing("", PairingFeatureTimedWindow)
 	record(pairing)
 	ends := time.Unix(1_800_000_000, 0)
-	pairing.OnStart(func(p PairingStartParams) (PairingStartResult, error) {
+	pairing.OnStart(func(p types.PairingStartParams) (types.PairingStartResult, error) {
 		if p.Duration == nil || *p.Duration != time.Minute {
 			t.Errorf("duration param: %+v", p)
 		}
-		return PairingStartResult{Ends: &ends}, nil
+		return types.PairingStartResult{Ends: &ends}, nil
 	})
 	result, err := invoke(pairing, "start", values.Field("duration", values.Duration(time.Minute)))
 	if err != nil {
@@ -146,7 +147,7 @@ func TestCommandResult(t *testing.T) {
 func TestStructuredAttributeAndCommand(t *testing.T) {
 	th := NewThermostat("", ThermostatFeatureSchedule)
 	r := record(th)
-	sched := []ThermostatScheduleItem{
+	sched := []types.ThermostatScheduleItem{
 		{Days: []string{"mon", "tue"}, Start: 7 * time.Hour, Setpoint: 20.5},
 		{Days: []string{"sat"}, Start: 9 * time.Hour, Setpoint: 19},
 	}
@@ -161,9 +162,9 @@ func TestStructuredAttributeAndCommand(t *testing.T) {
 		t.Fatalf("updates = %d", len(r.updates))
 	}
 
-	var received []ThermostatScheduleItem
-	th.OnSetSchedule(func(p ThermostatSetScheduleParams) error { received = p.Schedule; return nil })
-	if _, err := invoke(th, "set_schedule", values.Field("schedule", values.List(sched[0].value()))); err != nil {
+	var received []types.ThermostatScheduleItem
+	th.OnSetSchedule(func(p types.ThermostatSetScheduleParams) error { received = p.Schedule; return nil })
+	if _, err := invoke(th, "set_schedule", values.Field("schedule", values.List(sched[0].Value()))); err != nil {
 		t.Fatal(err)
 	}
 	if len(received) != 1 || received[0].Setpoint != 20.5 {
@@ -177,10 +178,10 @@ func TestEvents(t *testing.T) {
 	if err := button.EmitPress(); err != nil {
 		t.Fatal(err)
 	}
-	if err := button.EmitMultiPress(ButtonMultiPressEvent{Count: 2}); err != nil {
+	if err := button.EmitMultiPress(types.ButtonMultiPressEvent{Count: 2}); err != nil {
 		t.Fatal(err)
 	}
-	if err := button.EmitMultiPress(ButtonMultiPressEvent{Count: 0}); err == nil {
+	if err := button.EmitMultiPress(types.ButtonMultiPressEvent{Count: 0}); err == nil {
 		t.Fatal("count below min should be rejected")
 	}
 	if len(r.events) != 2 || r.events[0].Id != "press" || r.events[1].Fields[0].Value.GetInt() != 2 || r.events[1].Time == nil {

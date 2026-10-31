@@ -4,11 +4,8 @@ package services
 
 import (
 	"fmt"
-	"time"
 
-	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
 	"github.com/jimjibone/woodhouse-api/schema"
-	"github.com/jimjibone/woodhouse-api/values"
 )
 
 var loaded = schema.MustLoad()
@@ -22,14 +19,4 @@ func schemaService(name string) *schema.Service {
 		panic(fmt.Sprintf("services: schema has no service %q", name))
 	}
 	return srv
-}
-
-func durationOf(v *clientsapi.Value) time.Duration {
-	d, _ := values.AsDuration(v)
-	return d
-}
-
-func timeOf(v *clientsapi.Value) time.Time {
-	t, _ := values.AsTime(v)
-	return t
 }
