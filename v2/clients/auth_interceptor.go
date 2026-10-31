@@ -3,12 +3,14 @@ package clients
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/jimjibone/log"
 	"github.com/jimjibone/wh/v2/apitools"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
+	"github.com/jimjibone/woodhouse-api/schema"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -128,6 +130,14 @@ func (auth *AuthInterceptor) attachToken(ctx context.Context) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, "authorization", auth.accessToken)
 }
 
+// schemaVersion is sent with every call so the server can reject a client
+// built against another schema.
+var schemaVersion = strconv.Itoa(schema.Version())
+
+func attachSchemaVersion(ctx context.Context) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, schema.HeaderName, schemaVersion)
+}
+
 func (interceptor *AuthInterceptor) Unary() grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -137,6 +147,7 @@ func (interceptor *AuthInterceptor) Unary() grpc.UnaryClientInterceptor {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
+		ctx = attachSchemaVersion(ctx)
 		if apitools.RequiresAuth(method) {
 			interceptor.log.Debugf("--> unary: %s (with auth)", method)
 			return invoker(interceptor.attachToken(ctx), method, req, reply, cc, opts...)
@@ -158,6 +169,7 @@ func (interceptor *AuthInterceptor) Stream() grpc.StreamClientInterceptor {
 		streamer grpc.Streamer,
 		opts ...grpc.CallOption,
 	) (grpc.ClientStream, error) {
+		ctx = attachSchemaVersion(ctx)
 		if apitools.RequiresAuth(method) {
 			interceptor.log.Debugf("--> stream: %s (with auth)", method)
 			return streamer(interceptor.attachToken(ctx), desc, cc, method, opts...)

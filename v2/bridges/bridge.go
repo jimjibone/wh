@@ -2,6 +2,7 @@ package bridges
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -10,6 +11,8 @@ import (
 	"github.com/jimjibone/log"
 	"github.com/jimjibone/queue/v2"
 	"github.com/jimjibone/wh/v2/apitools"
+	"github.com/jimjibone/wh/v2/bridges/attributes"
+	"github.com/jimjibone/wh/v2/bridges/services"
 	"github.com/jimjibone/wh/v2/clients"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
 	"google.golang.org/grpc"
@@ -242,7 +245,7 @@ func (bridge *Bridge) deviceControl(ctx context.Context, conn *grpc.ClientConn) 
 			// Let the device handle it in another goroutine.
 			go func() {
 				lastStatus := clientsapi.ActionResponse_UNDEFINED
-				err := dev.HandleAction(req, func(res *clientsapi.ActionResponse) {
+				result, err := dev.HandleAction(req, func(res *clientsapi.ActionResponse) {
 					str := res.String()
 					if len(str) > 1000 {
 						str = str[:1000]
@@ -258,7 +261,7 @@ func (bridge *Bridge) deviceControl(ctx context.Context, conn *grpc.ClientConn) 
 					bridge.log.Debugf("sending action error response: %s", err)
 					err := stream.Send(&clientsapi.ActionResponse{
 						ActionId: req.GetActionId(),
-						Status:   clientsapi.ActionResponse_ERROR,
+						Status:   actionErrorStatus(err),
 						Details:  err.Error(),
 					})
 					if err != nil {
@@ -271,6 +274,7 @@ func (bridge *Bridge) deviceControl(ctx context.Context, conn *grpc.ClientConn) 
 							ActionId: req.GetActionId(),
 							Status:   clientsapi.ActionResponse_COMPLETE,
 							Details:  "",
+							Result:   result,
 						}
 						bridge.log.Debugf("sending action auto response: %s", res)
 						err := stream.Send(res)
@@ -282,6 +286,18 @@ func (bridge *Bridge) deviceControl(ctx context.Context, conn *grpc.ClientConn) 
 			}()
 		}
 	}
+}
+
+// actionErrorStatus maps a failed action's error to its final status.
+func actionErrorStatus(err error) clientsapi.ActionResponse_ActionStatus {
+	var invalid *services.InvalidError
+	switch {
+	case errors.Is(err, attributes.ErrReadOnly):
+		return clientsapi.ActionResponse_ERR_READONLY
+	case errors.As(err, &invalid):
+		return clientsapi.ActionResponse_ERR_INVALID
+	}
+	return clientsapi.ActionResponse_ERROR
 }
 
 func (bridge *Bridge) imagesControl(ctx context.Context, conn *grpc.ClientConn) {
