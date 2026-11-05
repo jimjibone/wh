@@ -9,8 +9,8 @@ import (
 
 	"github.com/jimjibone/log"
 	"github.com/jimjibone/wh/v2/apitools"
+	"github.com/jimjibone/wh/v2/types"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
-	"github.com/jimjibone/woodhouse-api/schema"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -132,10 +132,10 @@ func (auth *AuthInterceptor) attachToken(ctx context.Context) context.Context {
 
 // schemaVersion is sent with every call so the server can reject a client
 // built against another schema.
-var schemaVersion = strconv.Itoa(schema.Version())
+var schemaVersion = strconv.Itoa(types.SchemaVersion)
 
 func attachSchemaVersion(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, schema.HeaderName, schemaVersion)
+	return metadata.AppendToOutgoingContext(ctx, types.SchemaVersionHeader, schemaVersion)
 }
 
 func (interceptor *AuthInterceptor) Unary() grpc.UnaryClientInterceptor {

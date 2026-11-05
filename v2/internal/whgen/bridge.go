@@ -41,6 +41,21 @@ func bridge(s *schema.Schema) ([]byte, error) {
 		}
 		bridgeService(p, t, srv)
 	}
+
+	// The constructors by schema name, for the conformance tests.
+	p("// constructors builds each typed service by its schema name.\n")
+	p("var constructors = map[string]func(id string, features ...string) Service{\n")
+	for _, srv := range s.Services {
+		if srv.Open {
+			continue
+		}
+		if len(srv.Features) > 0 {
+			p("\t%q: func(id string, features ...string) Service { return New%s(id, features...) },\n", srv.Name, camel(srv.Name))
+		} else {
+			p("\t%q: func(id string, _ ...string) Service { return New%s(id) },\n", srv.Name, camel(srv.Name))
+		}
+	}
+	p("}\n")
 	return b.Bytes(), t.err
 }
 
@@ -64,18 +79,60 @@ func bridgeService(p func(string, ...any), t *types, srv *schema.Service) {
 		p(")\n\n")
 	}
 
-	// Constructor.
-	p("// New%s creates a %s service. The ID must be unique within the endpoint; \"\" means %q.\n", name, srv.Name, srv.Name)
+	// Constructor: attributes, commands and events with their specs written
+	// out, gated by the enabled features.
+	p("// New%s creates a %s service. The ID must be unique within the endpoint; \"\" defaults to %q.\n", name, srv.Name, srv.Name)
 	if len(srv.Features) > 0 {
-		p("// features enables optional capabilities (%sFeature...). Attributes, commands and\n// events of features that are not enabled are absent and their fields are nil.\n", name)
+		p("// features enables optional capabilities (%sFeature...). Attributes, commands and\n// events of features that are not enabled are absent and their fields are nil.\n// Unknown features panic.\n", name)
 		p("func New%s(id string, features ...string) *%s {\n", name, name)
-		p("\tsrv := &%s{Generic: FromSchema(schemaService(%q), id, features)}\n", name, srv.Name)
+		var consts []string
+		for _, f := range srv.Features {
+			consts = append(consts, name+"Feature"+camel(f.Name))
+		}
+		p("\tcheckFeatures(%q, features, %s)\n", srv.Name, strings.Join(consts, ", "))
+		p("\tsrv := &%s{Generic: newGeneric(id, clientsapi.Service_%s, features)}\n", name, srv.ProtoName())
 	} else {
 		p("func New%s(id string) *%s {\n", name, name)
-		p("\tsrv := &%s{Generic: FromSchema(schemaService(%q), id, nil)}\n", name, srv.Name)
+		p("\tsrv := &%s{Generic: newGeneric(id, clientsapi.Service_%s, nil)}\n", name, srv.ProtoName())
+	}
+	gated := func(features []string, body func(indent string)) {
+		if cond := featureCond(name, features); cond != "" {
+			p("\tif %s {\n", cond)
+			body("\t\t")
+			p("\t}\n")
+		} else {
+			body("\t")
+		}
 	}
 	for _, a := range srv.Attributes {
-		p("\tsrv.%s, _ = srv.Attribute(%q).(*attributes.%s)\n", camel(a.Name), a.Name, attrTypes[a.Type])
+		gated(a.Features, func(in string) {
+			p("%ssrv.%s = %s\n%ssrv.AddAttribute(srv.%s)\n", in, camel(a.Name), attrCtor(name, a), in, camel(a.Name))
+		})
+	}
+	fieldList := func(in, v string, fields []*schema.Field) {
+		p("%svar %s []*clientsapi.FieldSpec\n", in, v)
+		for _, f := range fields {
+			if cond := featureCond(name, f.Features); cond != "" {
+				p("%sif %s {\n%s\t%s = append(%s, %s)\n%s}\n", in, cond, in, v, v, fieldSpecExpr(name, f), in)
+			} else {
+				p("%s%s = append(%s, %s)\n", in, v, v, fieldSpecExpr(name, f))
+			}
+		}
+	}
+	for _, c := range srv.Commands {
+		gated(c.Features, func(in string) {
+			p("%s{\n", in)
+			fieldList(in+"\t", "params", c.Params)
+			fieldList(in+"\t", "result", c.Result)
+			p("%s\tsrv.AddCommand(&clientsapi.CommandSpec{Id: %q, Params: params, Result: result}, nil)\n%s}\n", in, c.Name, in)
+		})
+	}
+	for _, e := range srv.Events {
+		gated(e.Features, func(in string) {
+			p("%s{\n", in)
+			fieldList(in+"\t", "fields", e.Fields)
+			p("%s\tsrv.AddEvent(&clientsapi.EventSpec{Id: %q, Fields: fields})\n%s}\n", in, e.Name, in)
+		})
 	}
 	p("\tif s, ok := any(srv).(interface{ setup() }); ok {\n\t\ts.setup()\n\t}\n\treturn srv\n}\n\n")
 

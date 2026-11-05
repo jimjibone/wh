@@ -7,7 +7,6 @@ import (
 
 	"github.com/jimjibone/wh/v2/bridges/attributes"
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
-	"github.com/jimjibone/woodhouse-api/schema"
 	"github.com/jimjibone/woodhouse-api/values"
 )
 
@@ -51,36 +50,6 @@ func newGeneric(id string, typ clientsapi.Service_ServiceType, features []string
 	return &Generic{id: id, typ: typ, features: slices.Clone(features)}
 }
 
-// FromSchema creates the service a schema service type describes: every
-// attribute, command and event that the features enable, in schema order.
-// Commands have no handler until OnCommand is called. Unknown features panic,
-// since they are programming errors.
-func FromSchema(srv *schema.Service, id string, features []string) *Generic {
-	for _, f := range features {
-		if srv.Feature(f) == nil {
-			panic(fmt.Sprintf("services: %s has no feature %q", srv.Name, f))
-		}
-	}
-	typ := clientsapi.Service_ServiceType(clientsapi.Service_ServiceType_value[srv.ProtoName()])
-	g := newGeneric(id, typ, features)
-	for _, f := range srv.Attributes {
-		if values.Enabled(f.Features, features) {
-			g.AddAttribute(attributes.FromSchema(f, features))
-		}
-	}
-	for _, c := range srv.Commands {
-		if values.Enabled(c.Features, features) {
-			g.AddCommand(values.CommandSpecFromSchema(c, features), nil)
-		}
-	}
-	for _, e := range srv.Events {
-		if values.Enabled(e.Features, features) {
-			g.AddEvent(values.EventSpecFromSchema(e, features))
-		}
-	}
-	return g
-}
-
 // SetAlias sets the alias for this service. Sometimes used to differentiate
 // between multiple services of the same type on a single endpoint.
 func (srv *Generic) SetAlias(alias string) {
@@ -100,6 +69,11 @@ func (srv *Generic) AddAttribute(attrs ...attributes.Attribute) {
 		srv.attrs = slices.DeleteFunc(srv.attrs, func(a attributes.Attribute) bool { return a.ID() == attr.ID() })
 		srv.attrs = append(srv.attrs, attr)
 	}
+}
+
+// Attributes returns the service's attributes in the order added.
+func (srv *Generic) Attributes() []attributes.Attribute {
+	return slices.Clone(srv.attrs)
 }
 
 // Attribute returns the attribute with the ID, or nil.

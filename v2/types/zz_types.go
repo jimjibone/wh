@@ -16,6 +16,13 @@ var (
 	_ = values.Bool
 )
 
+// SchemaVersion is the version of the service schema this code was generated
+// from. Clients send it with every call in the SchemaVersionHeader metadata.
+const SchemaVersion = 2
+
+// SchemaVersionHeader is the gRPC metadata key carrying SchemaVersion.
+const SchemaVersionHeader = "woodhouse-schema-version"
+
 // IdentifyIdentifyParams are the params of identify.identify.
 type IdentifyIdentifyParams struct {
 	Duration *time.Duration // optional: How long to identify for. Device default when omitted.

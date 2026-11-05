@@ -39,39 +39,6 @@ func invoke(srv Service, id string, params ...*clientsapi.FieldValue) ([]*client
 	}, nil)
 }
 
-// Every generated service has the schema's service type, sends its required
-// attributes and declares the schema's commands and events.
-func TestGeneratedServicesMatchSchema(t *testing.T) {
-	built := map[string]Service{
-		"info": NewInfo(""), "online": NewOnline(""), "on_off": NewOnOff(""),
-		"light": NewLight("", LightFeatureBrightness, LightFeatureColorTemp, LightFeatureHS, LightFeatureXY),
-		"thermostat": NewThermostat("", ThermostatFeatureSchedule), "button": NewButton(""),
-		"pairing": NewPairing("", PairingFeatureTimedWindow, PairingFeatureCodeEntry),
-	}
-	for name, srv := range built {
-		s := Schema().Service(name)
-		pb := srv.Pb()
-		if pb.Typ.String() != s.ProtoName() || pb.Id != name {
-			t.Errorf("%s: typ %s id %q", name, pb.Typ, pb.Id)
-		}
-		for _, a := range s.Attributes {
-			if !a.Required {
-				continue
-			}
-			found := false
-			for _, got := range pb.Attrs {
-				found = found || got.Id == a.Name
-			}
-			if !found {
-				t.Errorf("%s: required attribute %q not sent", name, a.Name)
-			}
-		}
-		if len(pb.Commands) != len(s.Commands) || len(pb.Events) != len(s.Events) {
-			t.Errorf("%s: %d commands, %d events; schema has %d, %d", name, len(pb.Commands), len(pb.Events), len(s.Commands), len(s.Events))
-		}
-	}
-}
-
 func TestFeaturesGateAttributesAndCommands(t *testing.T) {
 	plain := NewLight("")
 	if plain.Brightness != nil || plain.Color != nil {

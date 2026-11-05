@@ -21,6 +21,10 @@ func typesFile(s *schema.Schema) ([]byte, error) {
 	p("import (\n\t\"time\"\n\n")
 	p("\tclientsapi \"github.com/jimjibone/woodhouse-api/go/v2/clients\"\n\t\"github.com/jimjibone/woodhouse-api/values\"\n)\n\n")
 	p("// Keep the imports used whatever the schema contains.\nvar (\n\t_ time.Duration\n\t_ *clientsapi.Value\n\t_ = values.Bool\n)\n\n")
+	p("// SchemaVersion is the version of the service schema this code was generated\n// from. Clients send it with every call in the SchemaVersionHeader metadata.\n")
+	p("const SchemaVersion = %d\n\n", s.Version)
+	p("// SchemaVersionHeader is the gRPC metadata key carrying SchemaVersion.\n")
+	p("const SchemaVersionHeader = %q\n\n", schema.HeaderName)
 
 	for _, name := range t.order {
 		st := t.structs[name]

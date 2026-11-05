@@ -34,15 +34,21 @@ type Info struct {
 // Static assert that Info implements the Service interface.
 var _ Service = (*Info)(nil)
 
-// NewInfo creates a info service. The ID must be unique within the endpoint; "" means "info".
+// NewInfo creates a info service. The ID must be unique within the endpoint; "" defaults to "info".
 func NewInfo(id string) *Info {
-	srv := &Info{Generic: FromSchema(schemaService("info"), id, nil)}
-	srv.Name, _ = srv.Attribute("name").(*attributes.Text)
-	srv.Model, _ = srv.Attribute("model").(*attributes.Text)
-	srv.Manufacturer, _ = srv.Attribute("manufacturer").(*attributes.Text)
-	srv.SerialNumber, _ = srv.Attribute("serial_number").(*attributes.Text)
-	srv.FirmwareVersion, _ = srv.Attribute("firmware_version").(*attributes.Text)
-	srv.WebURL, _ = srv.Attribute("web_url").(*attributes.Text)
+	srv := &Info{Generic: newGeneric(id, clientsapi.Service_INFO, nil)}
+	srv.Name = attributes.NewText("name", clientsapi.Permissions_PERM_READWRITE, attributes.Required)
+	srv.AddAttribute(srv.Name)
+	srv.Model = attributes.NewText("model", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Model)
+	srv.Manufacturer = attributes.NewText("manufacturer", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Manufacturer)
+	srv.SerialNumber = attributes.NewText("serial_number", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.SerialNumber)
+	srv.FirmwareVersion = attributes.NewText("firmware_version", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.FirmwareVersion)
+	srv.WebURL = attributes.NewText("web_url", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.WebURL)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -59,11 +65,13 @@ type Online struct {
 // Static assert that Online implements the Service interface.
 var _ Service = (*Online)(nil)
 
-// NewOnline creates a online service. The ID must be unique within the endpoint; "" means "online".
+// NewOnline creates a online service. The ID must be unique within the endpoint; "" defaults to "online".
 func NewOnline(id string) *Online {
-	srv := &Online{Generic: FromSchema(schemaService("online"), id, nil)}
-	srv.Online, _ = srv.Attribute("online").(*attributes.Bool)
-	srv.LastSeen, _ = srv.Attribute("last_seen").(*attributes.Time)
+	srv := &Online{Generic: newGeneric(id, clientsapi.Service_ONLINE, nil)}
+	srv.Online = attributes.NewBool("online", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.Online)
+	srv.LastSeen = attributes.NewTime("last_seen", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.LastSeen)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -79,10 +87,17 @@ type Identify struct {
 // Static assert that Identify implements the Service interface.
 var _ Service = (*Identify)(nil)
 
-// NewIdentify creates a identify service. The ID must be unique within the endpoint; "" means "identify".
+// NewIdentify creates a identify service. The ID must be unique within the endpoint; "" defaults to "identify".
 func NewIdentify(id string) *Identify {
-	srv := &Identify{Generic: FromSchema(schemaService("identify"), id, nil)}
-	srv.Identifying, _ = srv.Attribute("identifying").(*attributes.Bool)
+	srv := &Identify{Generic: newGeneric(id, clientsapi.Service_IDENTIFY, nil)}
+	srv.Identifying = attributes.NewBool("identifying", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.Identifying)
+	{
+		var params []*clientsapi.FieldSpec
+		params = append(params, &clientsapi.FieldSpec{Id: "duration", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: &clientsapi.DurationSpec{Min: ptr[int64](0), Max: ptr[int64](300000), Step: ptr[uint64](1000)}}}, Required: false})
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "identify", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -111,15 +126,26 @@ type Update struct {
 // Static assert that Update implements the Service interface.
 var _ Service = (*Update)(nil)
 
-// NewUpdate creates a update service. The ID must be unique within the endpoint; "" means "update".
+// NewUpdate creates a update service. The ID must be unique within the endpoint; "" defaults to "update".
 func NewUpdate(id string) *Update {
-	srv := &Update{Generic: FromSchema(schemaService("update"), id, nil)}
-	srv.Available, _ = srv.Attribute("available").(*attributes.Bool)
-	srv.CurrentVersion, _ = srv.Attribute("current_version").(*attributes.Text)
-	srv.UpdateVersion, _ = srv.Attribute("update_version").(*attributes.Text)
-	srv.Updating, _ = srv.Attribute("updating").(*attributes.Bool)
-	srv.Progress, _ = srv.Attribute("progress").(*attributes.Int)
-	srv.Remaining, _ = srv.Attribute("remaining").(*attributes.Duration)
+	srv := &Update{Generic: newGeneric(id, clientsapi.Service_UPDATE, nil)}
+	srv.Available = attributes.NewBool("available", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.Available)
+	srv.CurrentVersion = attributes.NewText("current_version", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.CurrentVersion)
+	srv.UpdateVersion = attributes.NewText("update_version", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.UpdateVersion)
+	srv.Updating = attributes.NewBool("updating", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Updating)
+	srv.Progress = attributes.NewInt("progress", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+	srv.AddAttribute(srv.Progress)
+	srv.Remaining = attributes.NewDuration("remaining", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.DurationSpec{Min: ptr[int64](0), Max: ptr[int64](3600000), Step: ptr[uint64](1000)})
+	srv.AddAttribute(srv.Remaining)
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "start", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -145,12 +171,15 @@ type Battery struct {
 // Static assert that Battery implements the Service interface.
 var _ Service = (*Battery)(nil)
 
-// NewBattery creates a battery service. The ID must be unique within the endpoint; "" means "battery".
+// NewBattery creates a battery service. The ID must be unique within the endpoint; "" defaults to "battery".
 func NewBattery(id string) *Battery {
-	srv := &Battery{Generic: FromSchema(schemaService("battery"), id, nil)}
-	srv.Level, _ = srv.Attribute("level").(*attributes.Int)
-	srv.Voltage, _ = srv.Attribute("voltage").(*attributes.Float)
-	srv.Charging, _ = srv.Attribute("charging").(*attributes.Bool)
+	srv := &Battery{Generic: newGeneric(id, clientsapi.Service_BATTERY, nil)}
+	srv.Level = attributes.NewInt("level", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+	srv.AddAttribute(srv.Level)
+	srv.Voltage = attributes.NewFloat("voltage", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_VOLTS})
+	srv.AddAttribute(srv.Voltage)
+	srv.Charging = attributes.NewBool("charging", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Charging)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -166,10 +195,11 @@ type DeviceTemperature struct {
 // Static assert that DeviceTemperature implements the Service interface.
 var _ Service = (*DeviceTemperature)(nil)
 
-// NewDeviceTemperature creates a device_temperature service. The ID must be unique within the endpoint; "" means "device_temperature".
+// NewDeviceTemperature creates a device_temperature service. The ID must be unique within the endpoint; "" defaults to "device_temperature".
 func NewDeviceTemperature(id string) *DeviceTemperature {
-	srv := &DeviceTemperature{Generic: FromSchema(schemaService("device_temperature"), id, nil)}
-	srv.Temperature, _ = srv.Attribute("temperature").(*attributes.Float)
+	srv := &DeviceTemperature{Generic: newGeneric(id, clientsapi.Service_DEVICE_TEMPERATURE, nil)}
+	srv.Temperature = attributes.NewFloat("temperature", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_CELSIUS})
+	srv.AddAttribute(srv.Temperature)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -185,10 +215,16 @@ type OnOff struct {
 // Static assert that OnOff implements the Service interface.
 var _ Service = (*OnOff)(nil)
 
-// NewOnOff creates a on_off service. The ID must be unique within the endpoint; "" means "on_off".
+// NewOnOff creates a on_off service. The ID must be unique within the endpoint; "" defaults to "on_off".
 func NewOnOff(id string) *OnOff {
-	srv := &OnOff{Generic: FromSchema(schemaService("on_off"), id, nil)}
-	srv.On, _ = srv.Attribute("on").(*attributes.Bool)
+	srv := &OnOff{Generic: newGeneric(id, clientsapi.Service_ON_OFF, nil)}
+	srv.On = attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required)
+	srv.AddAttribute(srv.On)
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "toggle", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -224,16 +260,45 @@ const (
 	LightFeatureXY         = "xy"         // CIE 1931 xy colour control.
 )
 
-// NewLight creates a light service. The ID must be unique within the endpoint; "" means "light".
+// NewLight creates a light service. The ID must be unique within the endpoint; "" defaults to "light".
 // features enables optional capabilities (LightFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewLight(id string, features ...string) *Light {
-	srv := &Light{Generic: FromSchema(schemaService("light"), id, features)}
-	srv.On, _ = srv.Attribute("on").(*attributes.Bool)
-	srv.Brightness, _ = srv.Attribute("brightness").(*attributes.Int)
-	srv.ColorTemp, _ = srv.Attribute("color_temp").(*attributes.Int)
-	srv.Color, _ = srv.Attribute("color").(*attributes.Color)
-	srv.ColorMode, _ = srv.Attribute("color_mode").(*attributes.Enum)
+	checkFeatures("light", features, LightFeatureBrightness, LightFeatureColorTemp, LightFeatureHS, LightFeatureXY)
+	srv := &Light{Generic: newGeneric(id, clientsapi.Service_LIGHT, features)}
+	srv.On = attributes.NewBool("on", clientsapi.Permissions_PERM_READWRITE, attributes.Required)
+	srv.AddAttribute(srv.On)
+	if srv.HasFeature(LightFeatureBrightness) {
+		srv.Brightness = attributes.NewInt("brightness", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+		srv.AddAttribute(srv.Brightness)
+	}
+	if srv.HasFeature(LightFeatureColorTemp) {
+		srv.ColorTemp = attributes.NewInt("color_temp", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](1000), Max: ptr[int64](10000), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_KELVIN})
+		srv.AddAttribute(srv.ColorTemp)
+	}
+	if srv.HasFeature(LightFeatureHS) || srv.HasFeature(LightFeatureXY) {
+		srv.Color = attributes.NewColor("color", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, srv.HasFeature(LightFeatureHS), srv.HasFeature(LightFeatureXY))
+		srv.AddAttribute(srv.Color)
+	}
+	srv.ColorMode = attributes.NewEnum("color_mode", clientsapi.Permissions_PERM_READONLY, attributes.Optional, "color_temp", "color")
+	srv.AddAttribute(srv.ColorMode)
+	{
+		var params []*clientsapi.FieldSpec
+		params = append(params, &clientsapi.FieldSpec{Id: "on", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Bool{Bool: &clientsapi.BoolSpec{}}}, Required: false})
+		if srv.HasFeature(LightFeatureBrightness) {
+			params = append(params, &clientsapi.FieldSpec{Id: "brightness", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE}}}, Required: false})
+		}
+		if srv.HasFeature(LightFeatureColorTemp) {
+			params = append(params, &clientsapi.FieldSpec{Id: "color_temp", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: &clientsapi.IntSpec{Min: ptr[int64](1000), Max: ptr[int64](10000), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_KELVIN}}}, Required: false})
+		}
+		if srv.HasFeature(LightFeatureHS) || srv.HasFeature(LightFeatureXY) {
+			params = append(params, &clientsapi.FieldSpec{Id: "color", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Color{Color: &clientsapi.ColorSpec{HueSat: srv.HasFeature(LightFeatureHS), Xy: srv.HasFeature(LightFeatureXY)}}}, Required: false})
+		}
+		params = append(params, &clientsapi.FieldSpec{Id: "transition", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: &clientsapi.DurationSpec{Min: ptr[int64](0), Max: ptr[int64](300000), Step: ptr[uint64](1000)}}}, Required: false})
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "set", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -265,14 +330,54 @@ const (
 	CoverFeatureTilt     = "tilt"     // Can tilt (slats).
 )
 
-// NewCover creates a cover service. The ID must be unique within the endpoint; "" means "cover".
+// NewCover creates a cover service. The ID must be unique within the endpoint; "" defaults to "cover".
 // features enables optional capabilities (CoverFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewCover(id string, features ...string) *Cover {
-	srv := &Cover{Generic: FromSchema(schemaService("cover"), id, features)}
-	srv.State, _ = srv.Attribute("state").(*attributes.Enum)
-	srv.Position, _ = srv.Attribute("position").(*attributes.Int)
-	srv.Tilt, _ = srv.Attribute("tilt").(*attributes.Int)
+	checkFeatures("cover", features, CoverFeaturePosition, CoverFeatureTilt)
+	srv := &Cover{Generic: newGeneric(id, clientsapi.Service_COVER, features)}
+	srv.State = attributes.NewEnum("state", clientsapi.Permissions_PERM_READONLY, attributes.Required, "opening", "closing", "stopped", "open", "closed")
+	srv.AddAttribute(srv.State)
+	if srv.HasFeature(CoverFeaturePosition) {
+		srv.Position = attributes.NewInt("position", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+		srv.AddAttribute(srv.Position)
+	}
+	if srv.HasFeature(CoverFeatureTilt) {
+		srv.Tilt = attributes.NewInt("tilt", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+		srv.AddAttribute(srv.Tilt)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "open", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "close", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "stop", Params: params, Result: result}, nil)
+	}
+	if srv.HasFeature(CoverFeaturePosition) {
+		{
+			var params []*clientsapi.FieldSpec
+			params = append(params, &clientsapi.FieldSpec{Id: "position", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE}}}, Required: true})
+			var result []*clientsapi.FieldSpec
+			srv.AddCommand(&clientsapi.CommandSpec{Id: "go_to", Params: params, Result: result}, nil)
+		}
+	}
+	if srv.HasFeature(CoverFeatureTilt) {
+		{
+			var params []*clientsapi.FieldSpec
+			params = append(params, &clientsapi.FieldSpec{Id: "tilt", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE}}}, Required: true})
+			var result []*clientsapi.FieldSpec
+			srv.AddCommand(&clientsapi.CommandSpec{Id: "tilt_to", Params: params, Result: result}, nil)
+		}
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -340,17 +445,35 @@ const (
 	ThermostatFeatureSchedule = "schedule" // Holds a heating schedule.
 )
 
-// NewThermostat creates a thermostat service. The ID must be unique within the endpoint; "" means "thermostat".
+// NewThermostat creates a thermostat service. The ID must be unique within the endpoint; "" defaults to "thermostat".
 // features enables optional capabilities (ThermostatFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewThermostat(id string, features ...string) *Thermostat {
-	srv := &Thermostat{Generic: FromSchema(schemaService("thermostat"), id, features)}
-	srv.HeatingSetpoint, _ = srv.Attribute("heating_setpoint").(*attributes.Float)
-	srv.LocalTemperature, _ = srv.Attribute("local_temperature").(*attributes.Float)
-	srv.HeatingDemand, _ = srv.Attribute("heating_demand").(*attributes.Bool)
-	srv.PiHeatingDemand, _ = srv.Attribute("pi_heating_demand").(*attributes.Int)
-	srv.ValvePosition, _ = srv.Attribute("valve_position").(*attributes.Int)
-	srv.Schedule, _ = srv.Attribute("schedule").(*attributes.List)
+	checkFeatures("thermostat", features, ThermostatFeatureSchedule)
+	srv := &Thermostat{Generic: newGeneric(id, clientsapi.Service_THERMOSTAT, features)}
+	srv.HeatingSetpoint = attributes.NewFloat("heating_setpoint", clientsapi.Permissions_PERM_READWRITE, attributes.Required, &clientsapi.FloatSpec{Min: ptr[float64](5), Max: ptr[float64](30), Step: ptr[float64](0.5), Unit: clientsapi.Unit_UNIT_CELSIUS})
+	srv.AddAttribute(srv.HeatingSetpoint)
+	srv.LocalTemperature = attributes.NewFloat("local_temperature", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_CELSIUS})
+	srv.AddAttribute(srv.LocalTemperature)
+	srv.HeatingDemand = attributes.NewBool("heating_demand", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.HeatingDemand)
+	srv.PiHeatingDemand = attributes.NewInt("pi_heating_demand", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+	srv.AddAttribute(srv.PiHeatingDemand)
+	srv.ValvePosition = attributes.NewInt("valve_position", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+	srv.AddAttribute(srv.ValvePosition)
+	if srv.HasFeature(ThermostatFeatureSchedule) {
+		srv.Schedule = attributes.NewList("schedule", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.ListSpec{Item: &clientsapi.Spec{Kind: &clientsapi.Spec_Struct{Struct: &clientsapi.StructSpec{Fields: []*clientsapi.FieldSpec{{Id: "days", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_List{List: &clientsapi.ListSpec{Item: &clientsapi.Spec{Kind: &clientsapi.Spec_Enum{Enum: &clientsapi.EnumSpec{Options: []string{"mon", "tue", "wed", "thu", "fri", "sat", "sun"}}}}, MinItems: ptr[uint32](1), MaxItems: ptr[uint32](7)}}}, Required: true}, {Id: "start", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: &clientsapi.DurationSpec{Min: ptr[int64](0), Max: ptr[int64](86400000), Step: ptr[uint64](60000)}}}, Required: true}, {Id: "setpoint", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: &clientsapi.FloatSpec{Min: ptr[float64](5), Max: ptr[float64](30), Step: ptr[float64](0.5), Unit: clientsapi.Unit_UNIT_CELSIUS}}}, Required: true}}}}}})
+		srv.AddAttribute(srv.Schedule)
+	}
+	if srv.HasFeature(ThermostatFeatureSchedule) {
+		{
+			var params []*clientsapi.FieldSpec
+			params = append(params, &clientsapi.FieldSpec{Id: "schedule", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_List{List: &clientsapi.ListSpec{Item: &clientsapi.Spec{Kind: &clientsapi.Spec_Struct{Struct: &clientsapi.StructSpec{Fields: []*clientsapi.FieldSpec{{Id: "days", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_List{List: &clientsapi.ListSpec{Item: &clientsapi.Spec{Kind: &clientsapi.Spec_Enum{Enum: &clientsapi.EnumSpec{Options: []string{"mon", "tue", "wed", "thu", "fri", "sat", "sun"}}}}, MinItems: ptr[uint32](1), MaxItems: ptr[uint32](7)}}}, Required: true}, {Id: "start", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: &clientsapi.DurationSpec{Min: ptr[int64](0), Max: ptr[int64](86400000), Step: ptr[uint64](60000)}}}, Required: true}, {Id: "setpoint", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: &clientsapi.FloatSpec{Min: ptr[float64](5), Max: ptr[float64](30), Step: ptr[float64](0.5), Unit: clientsapi.Unit_UNIT_CELSIUS}}}, Required: true}}}}}}}}, Required: true})
+			var result []*clientsapi.FieldSpec
+			srv.AddCommand(&clientsapi.CommandSpec{Id: "set_schedule", Params: params, Result: result}, nil)
+		}
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -397,10 +520,16 @@ type BinaryInput struct {
 // Static assert that BinaryInput implements the Service interface.
 var _ Service = (*BinaryInput)(nil)
 
-// NewBinaryInput creates a binary_input service. The ID must be unique within the endpoint; "" means "binary_input".
+// NewBinaryInput creates a binary_input service. The ID must be unique within the endpoint; "" defaults to "binary_input".
 func NewBinaryInput(id string) *BinaryInput {
-	srv := &BinaryInput{Generic: FromSchema(schemaService("binary_input"), id, nil)}
-	srv.On, _ = srv.Attribute("on").(*attributes.Bool)
+	srv := &BinaryInput{Generic: newGeneric(id, clientsapi.Service_BINARY_INPUT, nil)}
+	srv.On = attributes.NewBool("on", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.On)
+	{
+		var fields []*clientsapi.FieldSpec
+		fields = append(fields, &clientsapi.FieldSpec{Id: "on", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Bool{Bool: &clientsapi.BoolSpec{}}}, Required: true})
+		srv.AddEvent(&clientsapi.EventSpec{Id: "changed", Fields: fields})
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -428,14 +557,23 @@ const (
 	AnalogInputFeatureRangeMap = "range_map" // Maps the 0-100% reading onto a configured range.
 )
 
-// NewAnalogInput creates a analog_input service. The ID must be unique within the endpoint; "" means "analog_input".
+// NewAnalogInput creates a analog_input service. The ID must be unique within the endpoint; "" defaults to "analog_input".
 // features enables optional capabilities (AnalogInputFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewAnalogInput(id string, features ...string) *AnalogInput {
-	srv := &AnalogInput{Generic: FromSchema(schemaService("analog_input"), id, features)}
-	srv.Value, _ = srv.Attribute("value").(*attributes.Float)
-	srv.Mapped, _ = srv.Attribute("mapped").(*attributes.Float)
-	srv.RangeMap, _ = srv.Attribute("range_map").(*attributes.Struct)
+	checkFeatures("analog_input", features, AnalogInputFeatureRangeMap)
+	srv := &AnalogInput{Generic: newGeneric(id, clientsapi.Service_ANALOG_INPUT, features)}
+	srv.Value = attributes.NewFloat("value", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.FloatSpec{Min: ptr[float64](0), Max: ptr[float64](100), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+	srv.AddAttribute(srv.Value)
+	if srv.HasFeature(AnalogInputFeatureRangeMap) {
+		srv.Mapped = attributes.NewFloat("mapped", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.FloatSpec{})
+		srv.AddAttribute(srv.Mapped)
+	}
+	if srv.HasFeature(AnalogInputFeatureRangeMap) {
+		srv.RangeMap = attributes.NewStruct("range_map", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, &clientsapi.StructSpec{Fields: []*clientsapi.FieldSpec{{Id: "min", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: &clientsapi.FloatSpec{}}}, Required: true}, {Id: "max", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: &clientsapi.FloatSpec{}}}, Required: true}}})
+		srv.AddAttribute(srv.RangeMap)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -462,11 +600,35 @@ type Button struct {
 // Static assert that Button implements the Service interface.
 var _ Service = (*Button)(nil)
 
-// NewButton creates a button service. The ID must be unique within the endpoint; "" means "button".
+// NewButton creates a button service. The ID must be unique within the endpoint; "" defaults to "button".
 func NewButton(id string) *Button {
-	srv := &Button{Generic: FromSchema(schemaService("button"), id, nil)}
-	srv.LastEvent, _ = srv.Attribute("last_event").(*attributes.Enum)
-	srv.LastDuration, _ = srv.Attribute("last_duration").(*attributes.Duration)
+	srv := &Button{Generic: newGeneric(id, clientsapi.Service_BUTTON, nil)}
+	srv.LastEvent = attributes.NewEnum("last_event", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.LastEvent)
+	srv.LastDuration = attributes.NewDuration("last_duration", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.DurationSpec{})
+	srv.AddAttribute(srv.LastDuration)
+	{
+		var fields []*clientsapi.FieldSpec
+		srv.AddEvent(&clientsapi.EventSpec{Id: "press", Fields: fields})
+	}
+	{
+		var fields []*clientsapi.FieldSpec
+		srv.AddEvent(&clientsapi.EventSpec{Id: "release", Fields: fields})
+	}
+	{
+		var fields []*clientsapi.FieldSpec
+		srv.AddEvent(&clientsapi.EventSpec{Id: "hold", Fields: fields})
+	}
+	{
+		var fields []*clientsapi.FieldSpec
+		fields = append(fields, &clientsapi.FieldSpec{Id: "duration", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: &clientsapi.DurationSpec{}}}, Required: true})
+		srv.AddEvent(&clientsapi.EventSpec{Id: "long_release", Fields: fields})
+	}
+	{
+		var fields []*clientsapi.FieldSpec
+		fields = append(fields, &clientsapi.FieldSpec{Id: "count", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: &clientsapi.IntSpec{Min: ptr[int64](1), Max: ptr[int64](10), Step: ptr[uint64](1)}}}, Required: true})
+		srv.AddEvent(&clientsapi.EventSpec{Id: "multi_press", Fields: fields})
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -507,10 +669,11 @@ type Contact struct {
 // Static assert that Contact implements the Service interface.
 var _ Service = (*Contact)(nil)
 
-// NewContact creates a contact service. The ID must be unique within the endpoint; "" means "contact".
+// NewContact creates a contact service. The ID must be unique within the endpoint; "" defaults to "contact".
 func NewContact(id string) *Contact {
-	srv := &Contact{Generic: FromSchema(schemaService("contact"), id, nil)}
-	srv.Closed, _ = srv.Attribute("closed").(*attributes.Bool)
+	srv := &Contact{Generic: newGeneric(id, clientsapi.Service_CONTACT, nil)}
+	srv.Closed = attributes.NewBool("closed", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.Closed)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -526,10 +689,15 @@ type Motion struct {
 // Static assert that Motion implements the Service interface.
 var _ Service = (*Motion)(nil)
 
-// NewMotion creates a motion service. The ID must be unique within the endpoint; "" means "motion".
+// NewMotion creates a motion service. The ID must be unique within the endpoint; "" defaults to "motion".
 func NewMotion(id string) *Motion {
-	srv := &Motion{Generic: FromSchema(schemaService("motion"), id, nil)}
-	srv.Motion, _ = srv.Attribute("motion").(*attributes.Bool)
+	srv := &Motion{Generic: newGeneric(id, clientsapi.Service_MOTION, nil)}
+	srv.Motion = attributes.NewBool("motion", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.Motion)
+	{
+		var fields []*clientsapi.FieldSpec
+		srv.AddEvent(&clientsapi.EventSpec{Id: "detected", Fields: fields})
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -556,13 +724,19 @@ const (
 	PresenceFeatureDistance = "distance" // Reports the distance to the target.
 )
 
-// NewPresence creates a presence service. The ID must be unique within the endpoint; "" means "presence".
+// NewPresence creates a presence service. The ID must be unique within the endpoint; "" defaults to "presence".
 // features enables optional capabilities (PresenceFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewPresence(id string, features ...string) *Presence {
-	srv := &Presence{Generic: FromSchema(schemaService("presence"), id, features)}
-	srv.Presence, _ = srv.Attribute("presence").(*attributes.Bool)
-	srv.Distance, _ = srv.Attribute("distance").(*attributes.Float)
+	checkFeatures("presence", features, PresenceFeatureDistance)
+	srv := &Presence{Generic: newGeneric(id, clientsapi.Service_PRESENCE, features)}
+	srv.Presence = attributes.NewBool("presence", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.Presence)
+	if srv.HasFeature(PresenceFeatureDistance) {
+		srv.Distance = attributes.NewFloat("distance", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.FloatSpec{Min: ptr[float64](0), Max: ptr[float64](100), Step: ptr[float64](0.01), Unit: clientsapi.Unit_UNIT_METERS})
+		srv.AddAttribute(srv.Distance)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -578,10 +752,11 @@ type Temperature struct {
 // Static assert that Temperature implements the Service interface.
 var _ Service = (*Temperature)(nil)
 
-// NewTemperature creates a temperature service. The ID must be unique within the endpoint; "" means "temperature".
+// NewTemperature creates a temperature service. The ID must be unique within the endpoint; "" defaults to "temperature".
 func NewTemperature(id string) *Temperature {
-	srv := &Temperature{Generic: FromSchema(schemaService("temperature"), id, nil)}
-	srv.Temperature, _ = srv.Attribute("temperature").(*attributes.Float)
+	srv := &Temperature{Generic: newGeneric(id, clientsapi.Service_TEMPERATURE, nil)}
+	srv.Temperature = attributes.NewFloat("temperature", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_CELSIUS})
+	srv.AddAttribute(srv.Temperature)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -597,10 +772,11 @@ type Humidity struct {
 // Static assert that Humidity implements the Service interface.
 var _ Service = (*Humidity)(nil)
 
-// NewHumidity creates a humidity service. The ID must be unique within the endpoint; "" means "humidity".
+// NewHumidity creates a humidity service. The ID must be unique within the endpoint; "" defaults to "humidity".
 func NewHumidity(id string) *Humidity {
-	srv := &Humidity{Generic: FromSchema(schemaService("humidity"), id, nil)}
-	srv.Humidity, _ = srv.Attribute("humidity").(*attributes.Float)
+	srv := &Humidity{Generic: newGeneric(id, clientsapi.Service_HUMIDITY, nil)}
+	srv.Humidity = attributes.NewFloat("humidity", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.FloatSpec{Min: ptr[float64](0), Max: ptr[float64](100), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+	srv.AddAttribute(srv.Humidity)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -616,10 +792,11 @@ type Pressure struct {
 // Static assert that Pressure implements the Service interface.
 var _ Service = (*Pressure)(nil)
 
-// NewPressure creates a pressure service. The ID must be unique within the endpoint; "" means "pressure".
+// NewPressure creates a pressure service. The ID must be unique within the endpoint; "" defaults to "pressure".
 func NewPressure(id string) *Pressure {
-	srv := &Pressure{Generic: FromSchema(schemaService("pressure"), id, nil)}
-	srv.Pressure, _ = srv.Attribute("pressure").(*attributes.Float)
+	srv := &Pressure{Generic: newGeneric(id, clientsapi.Service_PRESSURE, nil)}
+	srv.Pressure = attributes.NewFloat("pressure", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_HECTOPASCAL})
+	srv.AddAttribute(srv.Pressure)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -638,13 +815,17 @@ type PowerMeter struct {
 // Static assert that PowerMeter implements the Service interface.
 var _ Service = (*PowerMeter)(nil)
 
-// NewPowerMeter creates a power_meter service. The ID must be unique within the endpoint; "" means "power_meter".
+// NewPowerMeter creates a power_meter service. The ID must be unique within the endpoint; "" defaults to "power_meter".
 func NewPowerMeter(id string) *PowerMeter {
-	srv := &PowerMeter{Generic: FromSchema(schemaService("power_meter"), id, nil)}
-	srv.Voltage, _ = srv.Attribute("voltage").(*attributes.Float)
-	srv.Current, _ = srv.Attribute("current").(*attributes.Float)
-	srv.Power, _ = srv.Attribute("power").(*attributes.Float)
-	srv.Energy, _ = srv.Attribute("energy").(*attributes.Float)
+	srv := &PowerMeter{Generic: newGeneric(id, clientsapi.Service_POWER_METER, nil)}
+	srv.Voltage = attributes.NewFloat("voltage", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_VOLTS})
+	srv.AddAttribute(srv.Voltage)
+	srv.Current = attributes.NewFloat("current", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_AMPS})
+	srv.AddAttribute(srv.Current)
+	srv.Power = attributes.NewFloat("power", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_WATTS})
+	srv.AddAttribute(srv.Power)
+	srv.Energy = attributes.NewFloat("energy", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.FloatSpec{Unit: clientsapi.Unit_UNIT_KILOWATT_HOURS})
+	srv.AddAttribute(srv.Energy)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -665,12 +846,24 @@ const (
 	CameraFeatureSnapshot = "snapshot" // Provides still images.
 )
 
-// NewCamera creates a camera service. The ID must be unique within the endpoint; "" means "camera".
+// NewCamera creates a camera service. The ID must be unique within the endpoint; "" defaults to "camera".
 // features enables optional capabilities (CameraFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewCamera(id string, features ...string) *Camera {
-	srv := &Camera{Generic: FromSchema(schemaService("camera"), id, features)}
-	srv.Image, _ = srv.Attribute("image").(*attributes.Image)
+	checkFeatures("camera", features, CameraFeatureSnapshot)
+	srv := &Camera{Generic: newGeneric(id, clientsapi.Service_CAMERA, features)}
+	if srv.HasFeature(CameraFeatureSnapshot) {
+		srv.Image = attributes.NewImage("image", attributes.Optional)
+		srv.AddAttribute(srv.Image)
+	}
+	{
+		var fields []*clientsapi.FieldSpec
+		fields = append(fields, &clientsapi.FieldSpec{Id: "label", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true})
+		fields = append(fields, &clientsapi.FieldSpec{Id: "score", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: &clientsapi.FloatSpec{Min: ptr[float64](0), Max: ptr[float64](1)}}}, Required: false})
+		fields = append(fields, &clientsapi.FieldSpec{Id: "zone", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: false})
+		srv.AddEvent(&clientsapi.EventSpec{Id: "detection", Fields: fields})
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -698,17 +891,50 @@ type MediaPlayback struct {
 // Static assert that MediaPlayback implements the Service interface.
 var _ Service = (*MediaPlayback)(nil)
 
-// NewMediaPlayback creates a media_playback service. The ID must be unique within the endpoint; "" means "media_playback".
+// NewMediaPlayback creates a media_playback service. The ID must be unique within the endpoint; "" defaults to "media_playback".
 func NewMediaPlayback(id string) *MediaPlayback {
-	srv := &MediaPlayback{Generic: FromSchema(schemaService("media_playback"), id, nil)}
-	srv.State, _ = srv.Attribute("state").(*attributes.Enum)
-	srv.NowPlaying, _ = srv.Attribute("now_playing").(*attributes.Text)
-	srv.Title, _ = srv.Attribute("title").(*attributes.Text)
-	srv.Artist, _ = srv.Attribute("artist").(*attributes.Text)
-	srv.Album, _ = srv.Attribute("album").(*attributes.Text)
-	srv.Elapsed, _ = srv.Attribute("elapsed").(*attributes.Duration)
-	srv.Duration, _ = srv.Attribute("duration").(*attributes.Duration)
-	srv.Art, _ = srv.Attribute("art").(*attributes.Image)
+	srv := &MediaPlayback{Generic: newGeneric(id, clientsapi.Service_MEDIA_PLAYBACK, nil)}
+	srv.State = attributes.NewEnum("state", clientsapi.Permissions_PERM_READONLY, attributes.Required, "playing", "paused", "stopped", "transitioning")
+	srv.AddAttribute(srv.State)
+	srv.NowPlaying = attributes.NewText("now_playing", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.NowPlaying)
+	srv.Title = attributes.NewText("title", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Title)
+	srv.Artist = attributes.NewText("artist", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Artist)
+	srv.Album = attributes.NewText("album", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Album)
+	srv.Elapsed = attributes.NewDuration("elapsed", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.DurationSpec{})
+	srv.AddAttribute(srv.Elapsed)
+	srv.Duration = attributes.NewDuration("duration", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.DurationSpec{})
+	srv.AddAttribute(srv.Duration)
+	srv.Art = attributes.NewImage("art", attributes.Optional)
+	srv.AddAttribute(srv.Art)
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "play", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "pause", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "stop", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "next", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "previous", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -772,15 +998,31 @@ const (
 	VolumeFeatureGroup = "group" // Also controls the volume of a speaker group.
 )
 
-// NewVolume creates a volume service. The ID must be unique within the endpoint; "" means "volume".
+// NewVolume creates a volume service. The ID must be unique within the endpoint; "" defaults to "volume".
 // features enables optional capabilities (VolumeFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewVolume(id string, features ...string) *Volume {
-	srv := &Volume{Generic: FromSchema(schemaService("volume"), id, features)}
-	srv.Level, _ = srv.Attribute("level").(*attributes.Int)
-	srv.Muted, _ = srv.Attribute("muted").(*attributes.Bool)
-	srv.GroupLevel, _ = srv.Attribute("group_level").(*attributes.Int)
-	srv.GroupMuted, _ = srv.Attribute("group_muted").(*attributes.Bool)
+	checkFeatures("volume", features, VolumeFeatureGroup)
+	srv := &Volume{Generic: newGeneric(id, clientsapi.Service_VOLUME, features)}
+	srv.Level = attributes.NewInt("level", clientsapi.Permissions_PERM_READWRITE, attributes.Required, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+	srv.AddAttribute(srv.Level)
+	srv.Muted = attributes.NewBool("muted", clientsapi.Permissions_PERM_READWRITE, attributes.Optional)
+	srv.AddAttribute(srv.Muted)
+	if srv.HasFeature(VolumeFeatureGroup) {
+		srv.GroupLevel = attributes.NewInt("group_level", clientsapi.Permissions_PERM_READWRITE, attributes.Optional, &clientsapi.IntSpec{Min: ptr[int64](0), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE})
+		srv.AddAttribute(srv.GroupLevel)
+	}
+	if srv.HasFeature(VolumeFeatureGroup) {
+		srv.GroupMuted = attributes.NewBool("group_muted", clientsapi.Permissions_PERM_READWRITE, attributes.Optional)
+		srv.AddAttribute(srv.GroupMuted)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		params = append(params, &clientsapi.FieldSpec{Id: "delta", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: &clientsapi.IntSpec{Min: ptr[int64](-100), Max: ptr[int64](100), Step: ptr[uint64](1), Unit: clientsapi.Unit_UNIT_PERCENTAGE}}}, Required: true})
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "step", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -804,10 +1046,17 @@ type MediaSources struct {
 // Static assert that MediaSources implements the Service interface.
 var _ Service = (*MediaSources)(nil)
 
-// NewMediaSources creates a media_sources service. The ID must be unique within the endpoint; "" means "media_sources".
+// NewMediaSources creates a media_sources service. The ID must be unique within the endpoint; "" defaults to "media_sources".
 func NewMediaSources(id string) *MediaSources {
-	srv := &MediaSources{Generic: FromSchema(schemaService("media_sources"), id, nil)}
-	srv.Sources, _ = srv.Attribute("sources").(*attributes.List)
+	srv := &MediaSources{Generic: newGeneric(id, clientsapi.Service_MEDIA_SOURCES, nil)}
+	srv.Sources = attributes.NewList("sources", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.ListSpec{Item: &clientsapi.Spec{Kind: &clientsapi.Spec_Struct{Struct: &clientsapi.StructSpec{Fields: []*clientsapi.FieldSpec{{Id: "id", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true}, {Id: "name", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true}}}}}})
+	srv.AddAttribute(srv.Sources)
+	{
+		var params []*clientsapi.FieldSpec
+		params = append(params, &clientsapi.FieldSpec{Id: "id", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true})
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "play", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -852,9 +1101,15 @@ type Remote struct {
 // Static assert that Remote implements the Service interface.
 var _ Service = (*Remote)(nil)
 
-// NewRemote creates a remote service. The ID must be unique within the endpoint; "" means "remote".
+// NewRemote creates a remote service. The ID must be unique within the endpoint; "" defaults to "remote".
 func NewRemote(id string) *Remote {
-	srv := &Remote{Generic: FromSchema(schemaService("remote"), id, nil)}
+	srv := &Remote{Generic: newGeneric(id, clientsapi.Service_REMOTE, nil)}
+	{
+		var params []*clientsapi.FieldSpec
+		params = append(params, &clientsapi.FieldSpec{Id: "key", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Enum{Enum: &clientsapi.EnumSpec{Options: nil}}}, Required: true})
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "send_key", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -888,16 +1143,63 @@ const (
 	PairingFeatureCodeEntry   = "code_entry"   // New devices are added by entering a setup code or PIN.
 )
 
-// NewPairing creates a pairing service. The ID must be unique within the endpoint; "" means "pairing".
+// NewPairing creates a pairing service. The ID must be unique within the endpoint; "" defaults to "pairing".
 // features enables optional capabilities (PairingFeature...). Attributes, commands and
 // events of features that are not enabled are absent and their fields are nil.
+// Unknown features panic.
 func NewPairing(id string, features ...string) *Pairing {
-	srv := &Pairing{Generic: FromSchema(schemaService("pairing"), id, features)}
-	srv.State, _ = srv.Attribute("state").(*attributes.Enum)
-	srv.Ends, _ = srv.Attribute("ends").(*attributes.Time)
-	srv.Remaining, _ = srv.Attribute("remaining").(*attributes.Duration)
-	srv.LastError, _ = srv.Attribute("last_error").(*attributes.Text)
-	srv.Recent, _ = srv.Attribute("recent").(*attributes.List)
+	checkFeatures("pairing", features, PairingFeatureTimedWindow, PairingFeatureCodeEntry)
+	srv := &Pairing{Generic: newGeneric(id, clientsapi.Service_PAIRING, features)}
+	srv.State = attributes.NewEnum("state", clientsapi.Permissions_PERM_READONLY, attributes.Required, "idle", "open", "busy")
+	srv.AddAttribute(srv.State)
+	if srv.HasFeature(PairingFeatureTimedWindow) {
+		srv.Ends = attributes.NewTime("ends", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+		srv.AddAttribute(srv.Ends)
+	}
+	if srv.HasFeature(PairingFeatureTimedWindow) {
+		srv.Remaining = attributes.NewDuration("remaining", clientsapi.Permissions_PERM_READONLY, attributes.Optional, &clientsapi.DurationSpec{})
+		srv.AddAttribute(srv.Remaining)
+	}
+	srv.LastError = attributes.NewText("last_error", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.LastError)
+	srv.Recent = attributes.NewList("recent", clientsapi.Permissions_PERM_READONLY, attributes.Required, &clientsapi.ListSpec{Item: &clientsapi.Spec{Kind: &clientsapi.Spec_Struct{Struct: &clientsapi.StructSpec{Fields: []*clientsapi.FieldSpec{{Id: "device_id", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true}, {Id: "name", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: false}, {Id: "state", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Enum{Enum: &clientsapi.EnumSpec{Options: []string{"joining", "interviewing", "paired", "failed"}}}}, Required: true}, {Id: "error", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: false}, {Id: "time", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Time{Time: &clientsapi.TimeSpec{}}}, Required: true}}}}}})
+	srv.AddAttribute(srv.Recent)
+	{
+		var params []*clientsapi.FieldSpec
+		if srv.HasFeature(PairingFeatureTimedWindow) {
+			params = append(params, &clientsapi.FieldSpec{Id: "duration", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: &clientsapi.DurationSpec{Min: ptr[int64](0), Max: ptr[int64](3600000), Step: ptr[uint64](1000)}}}, Required: false})
+		}
+		var result []*clientsapi.FieldSpec
+		if srv.HasFeature(PairingFeatureTimedWindow) {
+			result = append(result, &clientsapi.FieldSpec{Id: "ends", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Time{Time: &clientsapi.TimeSpec{}}}, Required: false})
+		}
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "start", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "stop", Params: params, Result: result}, nil)
+	}
+	if srv.HasFeature(PairingFeatureCodeEntry) {
+		{
+			var params []*clientsapi.FieldSpec
+			params = append(params, &clientsapi.FieldSpec{Id: "code", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true})
+			var result []*clientsapi.FieldSpec
+			srv.AddCommand(&clientsapi.CommandSpec{Id: "submit_code", Params: params, Result: result}, nil)
+		}
+	}
+	{
+		var fields []*clientsapi.FieldSpec
+		fields = append(fields, &clientsapi.FieldSpec{Id: "device_id", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true})
+		fields = append(fields, &clientsapi.FieldSpec{Id: "name", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: false})
+		srv.AddEvent(&clientsapi.EventSpec{Id: "paired", Fields: fields})
+	}
+	{
+		var fields []*clientsapi.FieldSpec
+		fields = append(fields, &clientsapi.FieldSpec{Id: "device_id", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: false})
+		fields = append(fields, &clientsapi.FieldSpec{Id: "error", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}}, Required: true})
+		srv.AddEvent(&clientsapi.EventSpec{Id: "failed", Fields: fields})
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -977,13 +1279,28 @@ type Sharing struct {
 // Static assert that Sharing implements the Service interface.
 var _ Service = (*Sharing)(nil)
 
-// NewSharing creates a sharing service. The ID must be unique within the endpoint; "" means "sharing".
+// NewSharing creates a sharing service. The ID must be unique within the endpoint; "" defaults to "sharing".
 func NewSharing(id string) *Sharing {
-	srv := &Sharing{Generic: FromSchema(schemaService("sharing"), id, nil)}
-	srv.Open, _ = srv.Attribute("open").(*attributes.Bool)
-	srv.Code, _ = srv.Attribute("code").(*attributes.Text)
-	srv.QR, _ = srv.Attribute("qr").(*attributes.Text)
-	srv.Ends, _ = srv.Attribute("ends").(*attributes.Time)
+	srv := &Sharing{Generic: newGeneric(id, clientsapi.Service_SHARING, nil)}
+	srv.Open = attributes.NewBool("open", clientsapi.Permissions_PERM_READONLY, attributes.Required)
+	srv.AddAttribute(srv.Open)
+	srv.Code = attributes.NewText("code", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Code)
+	srv.QR = attributes.NewText("qr", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.QR)
+	srv.Ends = attributes.NewTime("ends", clientsapi.Permissions_PERM_READONLY, attributes.Optional)
+	srv.AddAttribute(srv.Ends)
+	{
+		var params []*clientsapi.FieldSpec
+		params = append(params, &clientsapi.FieldSpec{Id: "timeout", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Duration{Duration: &clientsapi.DurationSpec{Min: ptr[int64](0), Max: ptr[int64](3600000), Step: ptr[uint64](1000)}}}, Required: false})
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "open", Params: params, Result: result}, nil)
+	}
+	{
+		var params []*clientsapi.FieldSpec
+		var result []*clientsapi.FieldSpec
+		srv.AddCommand(&clientsapi.CommandSpec{Id: "close", Params: params, Result: result}, nil)
+	}
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
@@ -1015,12 +1332,45 @@ type Mode struct {
 // Static assert that Mode implements the Service interface.
 var _ Service = (*Mode)(nil)
 
-// NewMode creates a mode service. The ID must be unique within the endpoint; "" means "mode".
+// NewMode creates a mode service. The ID must be unique within the endpoint; "" defaults to "mode".
 func NewMode(id string) *Mode {
-	srv := &Mode{Generic: FromSchema(schemaService("mode"), id, nil)}
-	srv.Value, _ = srv.Attribute("value").(*attributes.Enum)
+	srv := &Mode{Generic: newGeneric(id, clientsapi.Service_MODE, nil)}
+	srv.Value = attributes.NewEnum("value", clientsapi.Permissions_PERM_READWRITE, attributes.Required)
+	srv.AddAttribute(srv.Value)
 	if s, ok := any(srv).(interface{ setup() }); ok {
 		s.setup()
 	}
 	return srv
+}
+
+// constructors builds each typed service by its schema name.
+var constructors = map[string]func(id string, features ...string) Service{
+	"info":               func(id string, _ ...string) Service { return NewInfo(id) },
+	"online":             func(id string, _ ...string) Service { return NewOnline(id) },
+	"identify":           func(id string, _ ...string) Service { return NewIdentify(id) },
+	"update":             func(id string, _ ...string) Service { return NewUpdate(id) },
+	"battery":            func(id string, _ ...string) Service { return NewBattery(id) },
+	"device_temperature": func(id string, _ ...string) Service { return NewDeviceTemperature(id) },
+	"on_off":             func(id string, _ ...string) Service { return NewOnOff(id) },
+	"light":              func(id string, features ...string) Service { return NewLight(id, features...) },
+	"cover":              func(id string, features ...string) Service { return NewCover(id, features...) },
+	"thermostat":         func(id string, features ...string) Service { return NewThermostat(id, features...) },
+	"binary_input":       func(id string, _ ...string) Service { return NewBinaryInput(id) },
+	"analog_input":       func(id string, features ...string) Service { return NewAnalogInput(id, features...) },
+	"button":             func(id string, _ ...string) Service { return NewButton(id) },
+	"contact":            func(id string, _ ...string) Service { return NewContact(id) },
+	"motion":             func(id string, _ ...string) Service { return NewMotion(id) },
+	"presence":           func(id string, features ...string) Service { return NewPresence(id, features...) },
+	"temperature":        func(id string, _ ...string) Service { return NewTemperature(id) },
+	"humidity":           func(id string, _ ...string) Service { return NewHumidity(id) },
+	"pressure":           func(id string, _ ...string) Service { return NewPressure(id) },
+	"power_meter":        func(id string, _ ...string) Service { return NewPowerMeter(id) },
+	"camera":             func(id string, features ...string) Service { return NewCamera(id, features...) },
+	"media_playback":     func(id string, _ ...string) Service { return NewMediaPlayback(id) },
+	"volume":             func(id string, features ...string) Service { return NewVolume(id, features...) },
+	"media_sources":      func(id string, _ ...string) Service { return NewMediaSources(id) },
+	"remote":             func(id string, _ ...string) Service { return NewRemote(id) },
+	"pairing":            func(id string, features ...string) Service { return NewPairing(id, features...) },
+	"sharing":            func(id string, _ ...string) Service { return NewSharing(id) },
+	"mode":               func(id string, _ ...string) Service { return NewMode(id) },
 }

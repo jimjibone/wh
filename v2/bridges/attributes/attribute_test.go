@@ -6,7 +6,6 @@ import (
 	"time"
 
 	clientsapi "github.com/jimjibone/woodhouse-api/go/v2/clients"
-	"github.com/jimjibone/woodhouse-api/schema"
 	"github.com/jimjibone/woodhouse-api/values"
 )
 
@@ -100,32 +99,5 @@ func TestOptionalOnlyWhenSet(t *testing.T) {
 	attr.Set("x")
 	if !attr.IsSet() {
 		t.Fatal("should be set")
-	}
-}
-
-func TestFromSchemaBuildsEveryAttribute(t *testing.T) {
-	for _, srv := range schema.MustLoad().Services {
-		var all []string
-		for _, f := range srv.Features {
-			all = append(all, f.Name)
-		}
-		for _, f := range srv.Attributes {
-			attr := FromSchema(f, all)
-			if attr.ID() != f.Name {
-				t.Errorf("%s.%s: id %q", srv.Name, f.Name, attr.ID())
-			}
-			if (attr.Optional() == Required) != f.Required {
-				t.Errorf("%s.%s: required mismatch", srv.Name, f.Name)
-			}
-			if attr.Pb().Spec == nil {
-				t.Errorf("%s.%s: no spec", srv.Name, f.Name)
-			}
-		}
-	}
-
-	light := schema.MustLoad().Service("light")
-	color := FromSchema(light.Attribute("color"), []string{"hs"}).(*Color)
-	if c := color.Spec().GetColor(); !c.HueSat || c.Xy {
-		t.Fatalf("hs-only light color spec: %v", c)
 	}
 }
