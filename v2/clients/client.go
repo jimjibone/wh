@@ -238,7 +238,7 @@ func (client *Client) ping(ctx context.Context) bool {
 	conn, err := grpc.DialContext(
 		connCtx,
 		client.serverAddr,
-		grpc.WithTransportCredentials(creds),
+		append(schemaVersionOptions(), grpc.WithTransportCredentials(creds))...,
 	)
 	if err != nil {
 		client.log.Errorf("pairing connection failed: %s", err)
@@ -308,7 +308,7 @@ func (client *Client) pair(ctx context.Context) bool {
 	conn, err := grpc.DialContext(
 		connCtx,
 		client.serverAddr,
-		grpc.WithTransportCredentials(creds),
+		append(schemaVersionOptions(), grpc.WithTransportCredentials(creds))...,
 	)
 	if err != nil {
 		client.log.Errorf("pairing connection failed: %s", err)

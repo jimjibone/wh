@@ -138,6 +138,19 @@ func attachSchemaVersion(ctx context.Context) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, types.SchemaVersionHeader, schemaVersion)
 }
 
+// schemaVersionOptions send the schema version on connections without the auth
+// interceptor (ping and pairing), which the server checks too.
+func schemaVersionOptions() []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			return invoker(attachSchemaVersion(ctx), method, req, reply, cc, opts...)
+		}),
+		grpc.WithStreamInterceptor(func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			return streamer(attachSchemaVersion(ctx), desc, cc, method, opts...)
+		}),
+	}
+}
+
 func (interceptor *AuthInterceptor) Unary() grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
