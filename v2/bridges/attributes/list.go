@@ -19,7 +19,7 @@ func NewList(id string, perms clientsapi.Permissions, optional OptionalType, spe
 }
 
 // Get returns the items. Do not modify them.
-func (attr *List) Get() []*clientsapi.Value { return attr.value.GetList().GetItems() }
+func (attr *List) Get() []*clientsapi.Value { return attr.load().GetList().GetItems() }
 
 // Set sets the items, stamped by the server on receipt. Reports whether they
 // changed. The items are not validated against the spec.
@@ -35,5 +35,5 @@ func (attr *List) SetAt(items []*clientsapi.Value, t time.Time) bool {
 // OnWrite sets the handler called with validated written items. Its error
 // becomes the action's error.
 func (attr *List) OnWrite(handler func(items []*clientsapi.Value) error) {
-	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetList().GetItems()) }
+	attr.setOnWrite(func(v *clientsapi.Value) error { return handler(v.GetList().GetItems()) })
 }

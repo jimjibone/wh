@@ -20,10 +20,10 @@ func NewEnum(id string, perms clientsapi.Permissions, optional OptionalType, opt
 	return &Enum{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Enum{Enum: spec}})}
 }
 
-func (attr *Enum) Get() string { return attr.value.GetEnum() }
+func (attr *Enum) Get() string { return attr.load().GetEnum() }
 
 // Options returns a copy of the options.
-func (attr *Enum) Options() []string { return slices.Clone(attr.spec.GetEnum().GetOptions()) }
+func (attr *Enum) Options() []string { return slices.Clone(attr.loadSpec().GetEnum().GetOptions()) }
 
 // SetOptions replaces the options. Reports whether they changed.
 func (attr *Enum) SetOptions(options []string) bool {
@@ -41,5 +41,5 @@ func (attr *Enum) SetAt(value string, t time.Time) bool { return attr.set(values
 // OnWrite sets the handler called with a validated written value. Its error
 // becomes the action's error.
 func (attr *Enum) OnWrite(handler func(val string) error) {
-	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetEnum()) }
+	attr.setOnWrite(func(v *clientsapi.Value) error { return handler(v.GetEnum()) })
 }

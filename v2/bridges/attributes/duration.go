@@ -22,13 +22,13 @@ func NewDuration(id string, perms clientsapi.Permissions, optional OptionalType,
 }
 
 func (attr *Duration) Get() time.Duration {
-	d, _ := values.AsDuration(attr.value)
+	d, _ := values.AsDuration(attr.load())
 	return d
 }
 
 // DurationSpec returns a copy of the limits.
 func (attr *Duration) DurationSpec() *clientsapi.DurationSpec {
-	return proto.Clone(attr.spec.GetDuration()).(*clientsapi.DurationSpec)
+	return proto.Clone(attr.loadSpec().GetDuration()).(*clientsapi.DurationSpec)
 }
 
 // SetRange replaces min and max, keeping step.
@@ -53,8 +53,8 @@ func (attr *Duration) SetAt(value time.Duration, t time.Time) bool {
 // OnWrite sets the handler called with a validated written value. Its error
 // becomes the action's error.
 func (attr *Duration) OnWrite(handler func(val time.Duration) error) {
-	attr.onWrite = func(v *clientsapi.Value) error {
+	attr.setOnWrite(func(v *clientsapi.Value) error {
 		d, _ := values.AsDuration(v)
 		return handler(d)
-	}
+	})
 }

@@ -27,13 +27,18 @@ func NewImage(id string, optional OptionalType) *Image {
 
 // HandleImage calls the attribute's OnImageRequest handler.
 func (attr *Image) HandleImage() ([]byte, error) {
-	if attr.onImageRequest == nil {
+	attr.mu.Lock()
+	handler := attr.onImageRequest
+	attr.mu.Unlock()
+	if handler == nil {
 		return nil, ErrNoImageHandler
 	}
-	return attr.onImageRequest()
+	return handler()
 }
 
 // OnImageRequest sets the handler that fetches the image from the device.
 func (attr *Image) OnImageRequest(handler func() ([]byte, error)) {
+	attr.mu.Lock()
+	defer attr.mu.Unlock()
 	attr.onImageRequest = handler
 }

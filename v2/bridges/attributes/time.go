@@ -17,7 +17,7 @@ func NewTime(id string, perms clientsapi.Permissions, optional OptionalType) *Ti
 }
 
 func (attr *Time) Get() time.Time {
-	t, _ := values.AsTime(attr.value)
+	t, _ := values.AsTime(attr.load())
 	return t
 }
 
@@ -31,8 +31,8 @@ func (attr *Time) SetAt(value time.Time, t time.Time) bool { return attr.set(val
 // OnWrite sets the handler called with a validated written value. Its error
 // becomes the action's error.
 func (attr *Time) OnWrite(handler func(val time.Time) error) {
-	attr.onWrite = func(v *clientsapi.Value) error {
+	attr.setOnWrite(func(v *clientsapi.Value) error {
 		t, _ := values.AsTime(v)
 		return handler(t)
-	}
+	})
 }

@@ -21,11 +21,11 @@ func NewInt(id string, perms clientsapi.Permissions, optional OptionalType, spec
 	return &Int{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: spec}})}
 }
 
-func (attr *Int) Get() int64 { return attr.value.GetInt() }
+func (attr *Int) Get() int64 { return attr.load().GetInt() }
 
 // IntSpec returns a copy of the limits and unit.
 func (attr *Int) IntSpec() *clientsapi.IntSpec {
-	return proto.Clone(attr.spec.GetInt()).(*clientsapi.IntSpec)
+	return proto.Clone(attr.loadSpec().GetInt()).(*clientsapi.IntSpec)
 }
 
 // SetIntSpec replaces the limits and unit, e.g. with a device's own range.
@@ -50,5 +50,5 @@ func (attr *Int) SetAt(value int64, t time.Time) bool { return attr.set(values.I
 // OnWrite sets the handler called with a validated written value. Its error
 // becomes the action's error.
 func (attr *Int) OnWrite(handler func(val int64) error) {
-	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetInt()) }
+	attr.setOnWrite(func(v *clientsapi.Value) error { return handler(v.GetInt()) })
 }

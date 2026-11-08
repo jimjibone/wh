@@ -22,11 +22,11 @@ func NewFloat(id string, perms clientsapi.Permissions, optional OptionalType, sp
 	return &Float{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Float{Float: spec}})}
 }
 
-func (attr *Float) Get() float64 { return attr.value.GetFloat() }
+func (attr *Float) Get() float64 { return attr.load().GetFloat() }
 
 // FloatSpec returns a copy of the limits and unit.
 func (attr *Float) FloatSpec() *clientsapi.FloatSpec {
-	return proto.Clone(attr.spec.GetFloat()).(*clientsapi.FloatSpec)
+	return proto.Clone(attr.loadSpec().GetFloat()).(*clientsapi.FloatSpec)
 }
 
 // SetFloatSpec replaces the limits and unit.
@@ -47,14 +47,12 @@ func (attr *Float) Set(value float64) bool { return attr.SetAt(value, time.Time{
 
 // SetAt sets the value as observed by the device at t.
 func (attr *Float) SetAt(value float64, t time.Time) bool {
-	if attr.IsSet() && math.Abs(attr.Get()-value) <= 0.0001 {
-		return false
-	}
-	return attr.set(values.Float(value), t)
+	same := func(old *clientsapi.Value) bool { return math.Abs(old.GetFloat()-value) <= 0.0001 }
+	return attr.setUnless(same, values.Float(value), t)
 }
 
 // OnWrite sets the handler called with a validated written value. Its error
 // becomes the action's error.
 func (attr *Float) OnWrite(handler func(val float64) error) {
-	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetFloat()) }
+	attr.setOnWrite(func(v *clientsapi.Value) error { return handler(v.GetFloat()) })
 }

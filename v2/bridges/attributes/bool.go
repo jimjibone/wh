@@ -16,7 +16,7 @@ func NewBool(id string, perms clientsapi.Permissions, optional OptionalType) *Bo
 	return &Bool{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Bool{Bool: &clientsapi.BoolSpec{}}})}
 }
 
-func (attr *Bool) Get() bool { return attr.value.GetBool() }
+func (attr *Bool) Get() bool { return attr.load().GetBool() }
 
 // Set sets the value, stamped by the server on receipt. Reports whether it
 // changed.
@@ -28,5 +28,5 @@ func (attr *Bool) SetAt(value bool, t time.Time) bool { return attr.set(values.B
 // OnWrite sets the handler called with a validated written value. Its error
 // becomes the action's error.
 func (attr *Bool) OnWrite(handler func(val bool) error) {
-	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetBool()) }
+	attr.setOnWrite(func(v *clientsapi.Value) error { return handler(v.GetBool()) })
 }

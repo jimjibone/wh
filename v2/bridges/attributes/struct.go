@@ -19,7 +19,7 @@ func NewStruct(id string, perms clientsapi.Permissions, optional OptionalType, s
 }
 
 // Get returns the fields. Do not modify them.
-func (attr *Struct) Get() []*clientsapi.FieldValue { return attr.value.GetStruct().GetFields() }
+func (attr *Struct) Get() []*clientsapi.FieldValue { return attr.load().GetStruct().GetFields() }
 
 // Set sets the fields, stamped by the server on receipt. Reports whether they
 // changed. The fields are not validated against the spec.
@@ -35,5 +35,5 @@ func (attr *Struct) SetAt(fields []*clientsapi.FieldValue, t time.Time) bool {
 // OnWrite sets the handler called with validated written fields. Its error
 // becomes the action's error.
 func (attr *Struct) OnWrite(handler func(fields []*clientsapi.FieldValue) error) {
-	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetStruct().GetFields()) }
+	attr.setOnWrite(func(v *clientsapi.Value) error { return handler(v.GetStruct().GetFields()) })
 }

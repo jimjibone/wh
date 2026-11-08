@@ -16,7 +16,7 @@ func NewText(id string, perms clientsapi.Permissions, optional OptionalType) *Te
 	return &Text{newBase(id, perms, optional, &clientsapi.Spec{Kind: &clientsapi.Spec_Text{Text: &clientsapi.TextSpec{}}})}
 }
 
-func (attr *Text) Get() string { return attr.value.GetText() }
+func (attr *Text) Get() string { return attr.load().GetText() }
 
 // Set sets the value, stamped by the server on receipt. Reports whether it
 // changed.
@@ -28,5 +28,5 @@ func (attr *Text) SetAt(value string, t time.Time) bool { return attr.set(values
 // OnWrite sets the handler called with a validated written value. Its error
 // becomes the action's error.
 func (attr *Text) OnWrite(handler func(val string) error) {
-	attr.onWrite = func(v *clientsapi.Value) error { return handler(v.GetText()) }
+	attr.setOnWrite(func(v *clientsapi.Value) error { return handler(v.GetText()) })
 }

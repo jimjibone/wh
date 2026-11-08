@@ -21,7 +21,7 @@ func NewColor(id string, perms clientsapi.Permissions, optional OptionalType, hu
 
 // Get returns the color. Either encoding may be nil.
 func (attr *Color) Get() (hueSat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY) {
-	c := attr.value.GetColor()
+	c := attr.load().GetColor()
 	return c.GetHueSat(), c.GetXy()
 }
 
@@ -39,19 +39,18 @@ func (attr *Color) SetXY(x, y float64) bool {
 // SetAt sets the color as observed by the device at t (zero: the server
 // stamps it). Either encoding may be nil.
 func (attr *Color) SetAt(hueSat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY, t time.Time) bool {
-	oldHS, oldXY := attr.Get()
-	if attr.IsSet() && closeHueSat(oldHS, hueSat) && closeXY(oldXY, xy) {
-		return false
+	same := func(old *clientsapi.Value) bool {
+		return closeHueSat(old.GetColor().GetHueSat(), hueSat) && closeXY(old.GetColor().GetXy(), xy)
 	}
-	return attr.set(values.Color(hueSat, xy), t)
+	return attr.setUnless(same, values.Color(hueSat, xy), t)
 }
 
 // OnWrite sets the handler called with a validated written color. Either
 // encoding may be nil, never both. Its error becomes the action's error.
 func (attr *Color) OnWrite(handler func(hueSat *clientsapi.ColorHueSat, xy *clientsapi.ColorXY) error) {
-	attr.onWrite = func(v *clientsapi.Value) error {
+	attr.setOnWrite(func(v *clientsapi.Value) error {
 		return handler(v.GetColor().GetHueSat(), v.GetColor().GetXy())
-	}
+	})
 }
 
 func closeHueSat(a, b *clientsapi.ColorHueSat) bool {
