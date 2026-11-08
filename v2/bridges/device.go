@@ -280,9 +280,9 @@ func (dev *Device) run(ctx context.Context) {
 
 	var (
 		count  int
-		order  []string                                    // endpoint IDs in the order first updated
-		cache  map[string]*clientsapi.Endpoint             // key=endpoint ID
-		srvs   map[string]map[string]*clientsapi.Service   // key=endpoint ID, service ID
+		order  []string                                  // endpoint IDs in the order first updated
+		cache  map[string]*clientsapi.Endpoint           // key=endpoint ID
+		srvs   map[string]map[string]*clientsapi.Service // key=endpoint ID, service ID
 		events []*clientsapi.Event
 	)
 	resetCache := func() {

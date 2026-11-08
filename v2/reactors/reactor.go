@@ -34,7 +34,7 @@ type Reactor struct {
 	ready  *waiter.Waiter // ready when we're connected to the server and have received the first batch of device states
 
 	mu           sync.RWMutex
-	devices      map[string]*deviceState    // key=device ID
+	devices      map[string]*deviceState // key=device ID
 	views        map[serviceKey][]*ServiceView
 	onUpdate     UpdateCallback
 	onEventsLost func()
