@@ -124,6 +124,50 @@ func TestDeviceRemoved(t *testing.T) {
 	}
 }
 
+func TestViewClose(t *testing.T) {
+	rc := newTestReactor()
+	rc.handle(fullState())
+	now := time.Now()
+	press := func(seq uint64) {
+		rc.handle(eventUpdate(&clientsapi.Event{
+			EndpointId: "2", ServiceId: "button", Id: "press",
+			Time: values.TimeToPb(now), Epoch: "e1", Seq: seq,
+		}))
+	}
+
+	closed, kept := rc.Button(testDevice, "2"), rc.Button(testDevice, "2")
+	light := rc.Light(testDevice, "1")
+	var closedCalls, keptCalls, updates int
+	closed.OnPress(func(EventInfo) { closedCalls++ })
+	kept.OnPress(func(EventInfo) { keptCalls++ })
+	light.OnUpdate(func(bool) { updates++ })
+
+	press(1)
+	closed.Close()
+	closed.Close() // harmless
+	light.Close()
+	press(2)
+	rc.handle(partial("1", "light", &clientsapi.Attribute{Id: "brightness", Value: values.Int(55)}))
+
+	if closedCalls != 1 || keptCalls != 2 {
+		t.Fatalf("closed view got %d presses (want 1), kept view %d (want 2)", closedCalls, keptCalls)
+	}
+	if updates != 0 {
+		t.Fatalf("closed light view got %d updates", updates)
+	}
+	if light.Brightness() != 55 {
+		t.Fatal("closed view should still read the mirrored state")
+	}
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	if len(rc.views[serviceKey{testDevice, "2", "button"}]) != 1 {
+		t.Fatal("closed view still registered")
+	}
+	if _, ok := rc.views[serviceKey{testDevice, "1", "light"}]; ok {
+		t.Fatal("empty view list not deleted")
+	}
+}
+
 func TestEventsAndReplayPolicy(t *testing.T) {
 	rc := newTestReactor()
 	now := time.Unix(1_800_000_000, 0)

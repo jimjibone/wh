@@ -158,6 +158,23 @@ func (v *ServiceView) OnEvent(id string, handler func(e *clientsapi.Event, info 
 	v.events = append(v.events, h)
 }
 
+// Close unregisters the view: its update and event handlers are dropped and
+// the reactor no longer holds it. A handler call already dispatched when
+// Close is called may still run. The view still reads the mirrored state
+// after Close. Closing twice is harmless.
+func (v *ServiceView) Close() {
+	v.rc.mu.Lock()
+	defer v.rc.mu.Unlock()
+	v.onUpdate = nil
+	v.events = nil
+	views := slices.DeleteFunc(v.rc.views[v.key], func(o *ServiceView) bool { return o == v })
+	if len(views) == 0 {
+		delete(v.rc.views, v.key)
+	} else {
+		v.rc.views[v.key] = views
+	}
+}
+
 // Write writes attribute values and waits for the action to finish.
 func (v *ServiceView) Write(ctx context.Context, fields ...*clientsapi.FieldValue) error {
 	_, err := v.Do(ctx, &clientsapi.ActionRequest{
