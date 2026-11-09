@@ -21,9 +21,13 @@ const RootEndpointID = "0"
 // services. The root endpoint "0" always exists and holds the Info and Online
 // services.
 type Device struct {
-	log       *log.Context
-	id        string
-	typ       clientsapi.Device_DeviceType
+	log *log.Context
+	id  string
+	typ clientsapi.Device_DeviceType
+	// sendMu guards sendState. It is separate from mu because the send loop
+	// must never wait for mu: SendFullState holds mu while reading attributes,
+	// whose updates queue to the send loop.
+	sendMu    sync.Mutex
 	sendState func(state *clientsapi.Device)
 
 	mu        sync.RWMutex // guards endpoints
@@ -194,7 +198,11 @@ func (ep *Endpoint) service(id string) services.Service {
 // all services, or a diff of those changed since the last call of SendState by
 // the device. The client will indicate if a full state should be sent by
 // calling SendFullState on the device.
-func (dev *Device) Init(sendState func(state *clientsapi.Device)) { dev.sendState = sendState }
+func (dev *Device) Init(sendState func(state *clientsapi.Device)) {
+	dev.sendMu.Lock()
+	defer dev.sendMu.Unlock()
+	dev.sendState = sendState
+}
 
 // SendFullState is called when a full device state should be sent to the
 // server. This is typically done just after the client connects to the
@@ -294,12 +302,15 @@ func (dev *Device) run(ctx context.Context) {
 	resetCache()
 
 	send := func(what string, pb *clientsapi.Device) {
-		if dev.sendState == nil {
+		dev.sendMu.Lock()
+		sendState := dev.sendState
+		dev.sendMu.Unlock()
+		if sendState == nil {
 			dev.log.Debugf("warning not sending %s (device not registered with client)\n%s", what, PrettyDevice("  ", pb))
 			return
 		}
 		dev.log.Debugf("sending %s\n%s", what, PrettyDevice("  ", pb))
-		dev.sendState(pb)
+		sendState(pb)
 	}
 	sendCache := func() {
 		if len(cache) == 0 && len(events) == 0 {

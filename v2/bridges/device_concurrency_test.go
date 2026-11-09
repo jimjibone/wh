@@ -9,6 +9,32 @@ import (
 	"github.com/jimjibone/woodhouse-api/values"
 )
 
+// A bridge may build a device and set its attributes before adding it to the
+// client, so Init can run while the send loop handles those updates.
+func TestDeviceInitWhileUpdating(t *testing.T) {
+	dev, outs, _ := twoChannelRelay()
+	defer dev.Close()
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+				outs[0].On.Set(i%2 == 0)
+			}
+		}
+	}()
+	time.Sleep(10 * time.Millisecond)
+	dev.Init(func(*clientsapi.Device) {})
+	time.Sleep(10 * time.Millisecond)
+	close(stop)
+	wg.Wait()
+}
+
 // Full states, label changes and actions run while attributes push updates
 // through the device. Run with -race; a lock-order cycle would hang it.
 func TestDeviceConcurrentUse(t *testing.T) {
