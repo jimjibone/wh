@@ -660,6 +660,33 @@ func (srv *Button) EmitMultiPress(e types.ButtonMultiPressEvent) error {
 	return srv.Emit("multi_press", e.Fields()...)
 }
 
+// Rotary: A relative rotary input, e.g. a dial or knob. Each turn is an event; the service holds no position.
+type Rotary struct {
+	*Generic
+}
+
+// Static assert that Rotary implements the Service interface.
+var _ Service = (*Rotary)(nil)
+
+// NewRotary creates a rotary service. The ID must be unique within the endpoint; "" defaults to "rotary".
+func NewRotary(id string) *Rotary {
+	srv := &Rotary{Generic: newGeneric(id, clientsapi.Service_ROTARY, nil)}
+	{
+		var fields []*clientsapi.FieldSpec
+		fields = append(fields, &clientsapi.FieldSpec{Id: "steps", Spec: &clientsapi.Spec{Kind: &clientsapi.Spec_Int{Int: &clientsapi.IntSpec{Min: ptr[int64](-255), Max: ptr[int64](255), Step: ptr[uint64](1)}}}, Required: true})
+		srv.AddEvent(&clientsapi.EventSpec{Id: "rotate", Fields: fields})
+	}
+	if s, ok := any(srv).(interface{ setup() }); ok {
+		s.setup()
+	}
+	return srv
+}
+
+// EmitRotate emits the rotate event, seen now.
+func (srv *Rotary) EmitRotate(e types.RotaryRotateEvent) error {
+	return srv.Emit("rotate", e.Fields()...)
+}
+
 // Contact: A contact sensor, e.g. on a door or window.
 type Contact struct {
 	*Generic
@@ -1358,6 +1385,7 @@ var constructors = map[string]func(id string, features ...string) Service{
 	"binary_input":       func(id string, _ ...string) Service { return NewBinaryInput(id) },
 	"analog_input":       func(id string, features ...string) Service { return NewAnalogInput(id, features...) },
 	"button":             func(id string, _ ...string) Service { return NewButton(id) },
+	"rotary":             func(id string, _ ...string) Service { return NewRotary(id) },
 	"contact":            func(id string, _ ...string) Service { return NewContact(id) },
 	"motion":             func(id string, _ ...string) Service { return NewMotion(id) },
 	"presence":           func(id string, features ...string) Service { return NewPresence(id, features...) },

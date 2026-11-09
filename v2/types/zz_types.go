@@ -357,6 +357,32 @@ func ParseButtonMultiPressEvent(fs []*clientsapi.FieldValue) ButtonMultiPressEve
 	return x
 }
 
+// RotaryRotateEvent are the fields of the rotary.rotate event.
+type RotaryRotateEvent struct {
+	Steps int64 // required: Signed step count; positive is clockwise (up), negative anticlockwise (down).
+}
+
+// Fields converts RotaryRotateEvent to API field values. Unset optional fields are left out.
+func (x RotaryRotateEvent) Fields() []*clientsapi.FieldValue {
+	var fs []*clientsapi.FieldValue
+	fs = append(fs, values.Field("steps", values.Int(x.Steps)))
+	return fs
+}
+
+// Value converts RotaryRotateEvent to an API struct value.
+func (x RotaryRotateEvent) Value() *clientsapi.Value { return values.Struct(x.Fields()...) }
+
+// ParseRotaryRotateEvent reads RotaryRotateEvent from API field values. Fields of the wrong kind read as
+// zero; validate against the spec first.
+func ParseRotaryRotateEvent(fs []*clientsapi.FieldValue) RotaryRotateEvent {
+	m := values.Fields(fs)
+	var x RotaryRotateEvent
+	if v, ok := m["steps"]; ok {
+		x.Steps = v.GetInt()
+	}
+	return x
+}
+
 // CameraDetectionEvent are the fields of the camera.detection event.
 type CameraDetectionEvent struct {
 	Label string   // required: What was detected, e.g. person or car.

@@ -615,6 +615,21 @@ func (v *ButtonView) HasLastDuration() bool {
 	return v.Has("last_duration")
 }
 
+// RotaryView is a reactor's view of a rotary service: A relative rotary input, e.g. a dial or knob. Each turn is an event; the service holds no position.
+type RotaryView struct{ *ServiceView }
+
+// Rotary returns a view of the rotary service on an endpoint of a device. serviceID
+// defaults to "rotary".
+func (rc *Reactor) Rotary(deviceID, endpointID string, serviceID ...string) *RotaryView {
+	return &RotaryView{rc.view(deviceID, endpointID, serviceID, "rotary", clientsapi.Service_ROTARY)}
+}
+
+// OnRotate adds a handler for the rotate event. Replayed events older than
+// DefaultMaxEventAge are dropped unless MaxAge says otherwise.
+func (v *RotaryView) OnRotate(handler func(e types.RotaryRotateEvent, info EventInfo), opts ...EventOption) {
+	v.OnEvent("rotate", func(e *clientsapi.Event, info EventInfo) { handler(types.ParseRotaryRotateEvent(e.GetFields()), info) }, opts...)
+}
+
 // ContactView is a reactor's view of a contact service: A contact sensor, e.g. on a door or window.
 type ContactView struct{ *ServiceView }
 
