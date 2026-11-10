@@ -31,6 +31,26 @@ func TestSetPushesValueOnlyOnChange(t *testing.T) {
 	}
 }
 
+func TestOptionalFirstSetPushesWholeAttribute(t *testing.T) {
+	attr := NewInt("brightness", clientsapi.Permissions_PERM_READWRITE, Optional, &clientsapi.IntSpec{})
+	got := capture(attr)
+	at := time.Unix(1_800_000_000, 0)
+
+	attr.SetAt(4, at)
+	attr.Set(5)
+	if len(*got) != 2 {
+		t.Fatalf("pushes = %d, want 2", len(*got))
+	}
+	first := (*got)[0]
+	if first.Perms != clientsapi.Permissions_PERM_READWRITE || first.Spec.GetInt() == nil || first.Value.GetInt() != 4 ||
+		!values.TimeFromPb(first.Time).Equal(at) {
+		t.Fatalf("first value of an optional attribute should carry the whole attribute: %v", first)
+	}
+	if second := (*got)[1]; second.Spec != nil || second.Value.GetInt() != 5 {
+		t.Fatalf("later updates should carry only the value: %v", second)
+	}
+}
+
 func TestSetAtCarriesObservationTime(t *testing.T) {
 	attr := NewBool("on", clientsapi.Permissions_PERM_READONLY, Required)
 	got := capture(attr)

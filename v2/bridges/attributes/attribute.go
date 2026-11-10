@@ -196,8 +196,15 @@ func (b *base) setUnless(same func(old *clientsapi.Value) bool, v *clientsapi.Va
 	if proto.Equal(b.value, v) || (same != nil && values.IsSet(b.value) && same(b.value)) {
 		return false
 	}
+	firstOptional := b.optional == Optional && !values.IsSet(b.value)
 	b.value = v
 	b.at = t
+	if firstOptional {
+		// An optional attribute is left out of the service snapshot until it
+		// has a value, so the server has not seen its perms or spec yet.
+		b.send(b.pb())
+		return true
+	}
 	update := &clientsapi.Attribute{Id: b.id, Value: v}
 	if !t.IsZero() {
 		update.Time = values.TimeToPb(t)
